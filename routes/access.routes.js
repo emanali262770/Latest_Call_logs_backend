@@ -2,6 +2,7 @@ import express from "express";
 import {
   assignPermissionToGroup,
   assignGroupToUser,
+  getUserGroups,
   getMyPermissions,
 } from "../controllers/access.controller.js";
 
@@ -24,6 +25,14 @@ router.post(
   protect,
   checkPermission("ACCESS.USERS.ASSIGN"),
   assignGroupToUser
+);
+
+// GET USER GROUPS
+router.get(
+  "/users/:id/groups",
+  protect,
+  checkPermission("ACCESS.USERS.READ"),
+  getUserGroups
 );
 
 // GET LOGGED-IN USER PERMISSIONS

@@ -1,6 +1,8 @@
 import express from "express";
 import {
   createGroup,
+  getAvailableGroupPermissions,
+  getGroupPermissions,
   getGroups,
 } from "../controllers/group.controller.js";
 
@@ -23,6 +25,22 @@ router.get(
   protect,
   checkPermission("ACCESS.GROUPS.READ"),
   getGroups
+);
+
+// GET GROUP PERMISSIONS
+router.get(
+  "/:id/permissions",
+  protect,
+  checkPermission("ACCESS.GROUPS.READ"),
+  getGroupPermissions
+);
+
+// GET AVAILABLE GROUP PERMISSIONS
+router.get(
+  "/:id/available-permissions",
+  protect,
+  checkPermission("ACCESS.GROUPS.READ"),
+  getAvailableGroupPermissions
 );
 
 export default router;

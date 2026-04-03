@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "test": "node seedAdmin.js",
+    "seed:admin": "node seedAdmin.js",
     "dev": "nodemon server.js",
     "permissions:sync": "node syncPermissions.js"
   },

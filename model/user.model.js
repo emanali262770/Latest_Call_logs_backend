@@ -27,6 +27,7 @@ export const getUsersModel = async () => {
       u.UserName,
       u.status,
       u.employee_id,
+      u.created_at AS createdAt,
       COALESCE(e.employee_name, e.first_name) AS employee_name,
       e.first_name,
       e.last_name,
@@ -46,6 +47,7 @@ export const getUserByIdModel = async (id) => {
     `
     SELECT 
       u.*,
+      u.created_at AS createdAt,
       COALESCE(e.employee_name, e.first_name) AS employee_name,
       e.first_name,
       e.last_name,
@@ -87,6 +89,19 @@ export const getUserByEmployeeIdModel = async (employee_id) => {
   );
 
   return rows[0];
+};
+
+export const updateUserPasswordModel = async ({ id, password }) => {
+  const [result] = await db.execute(
+    `
+    UPDATE users
+    SET password = ?
+    WHERE id = ?
+    `,
+    [password, id]
+  );
+
+  return result;
 };
 
 // UPDATE USER

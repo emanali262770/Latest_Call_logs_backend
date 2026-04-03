@@ -3,6 +3,13 @@ import { db } from "../config/db.js";
 export const checkPermission = (requiredPermission) => {
   return async (req, res, next) => {
     try {
+      const username = String(req.user?.username || "").toLowerCase();
+
+      // Allow the seeded super admin account to bypass group-based checks.
+      if (username === "admin") {
+        return next();
+      }
+
       const userId = req.user.id;
 
       const [rows] = await db.execute(

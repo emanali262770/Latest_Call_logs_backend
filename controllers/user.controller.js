@@ -6,6 +6,7 @@ import {
   getUserByIdModel,
   getUserByEmployeeIdModel,
   getUserByUsernameModel,
+  updateUserPasswordModel,
   updateUserModel,
 } from "../model/user.model.js";
 import { getEmployeeByIdModel } from "../model/employee.model.js";
@@ -116,6 +117,35 @@ export const updateUser = async (req, res) => {
     return successResponse(res, "User updated successfully");
   } catch (error) {
     return errorResponse(res, "Failed to update user", 500, error.message);
+  }
+};
+
+// CHANGE USER PASSWORD
+export const changeUserPassword = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { password } = req.body;
+
+    if (!password) {
+      return errorResponse(res, "password is required", 400);
+    }
+
+    const user = await getUserByIdModel(userId);
+
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await updateUserPasswordModel({
+      id: userId,
+      password: hashedPassword,
+    });
+
+    return successResponse(res, "Password changed successfully");
+  } catch (error) {
+    return errorResponse(res, "Failed to change password", 500, error.message);
   }
 };
 

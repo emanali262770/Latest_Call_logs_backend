@@ -22,12 +22,36 @@ export const assignGroupToUserModel = async (user_id, group_id) => {
   const [result] = await db.execute(
     `
     INSERT INTO user_groups (user_id, group_id)
-    VALUES (?, ?)
+    SELECT ?, ? FROM DUAL
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM user_groups
+      WHERE user_id = ? AND group_id = ?
+    )
     `,
-    [user_id, group_id]
+    [user_id, group_id, user_id, group_id]
   );
 
   return result;
+};
+
+export const getUserGroupsModel = async (user_id) => {
+  const [rows] = await db.execute(
+    `
+    SELECT
+      ug.group_id,
+      g.group_name,
+      g.description,
+      g.status
+    FROM user_groups ug
+    INNER JOIN software_groups g ON ug.group_id = g.id
+    WHERE ug.user_id = ?
+    ORDER BY g.group_name ASC
+    `,
+    [user_id]
+  );
+
+  return rows;
 };
 
 export const getUserPermissionsModel = async (user_id) => {

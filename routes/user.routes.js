@@ -5,6 +5,7 @@ import { protect } from "../middlewares/auth.middleware.js";
 import { checkPermission } from "../middlewares/permission.middleware.js";
 import {
   createUser,
+  changeUserPassword,
   getUsers,
   getUserById,
   updateUser,
@@ -27,6 +28,14 @@ router.get(
   protect,
   checkPermission("ACCESS.USERS.READ"),
   getUsers
+);
+
+// CHANGE USER PASSWORD
+router.put(
+  "/:id/change-password",
+  protect,
+  checkPermission("ACCESS.USERS.UPDATE"),
+  changeUserPassword
 );
 
 // GET SINGLE USER

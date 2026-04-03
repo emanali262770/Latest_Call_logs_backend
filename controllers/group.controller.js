@@ -1,4 +1,10 @@
-import { createGroupModel, getGroupsModel } from "../model/group.model.js";
+import {
+  createGroupModel,
+  getAvailableGroupPermissionsModel,
+  getGroupByIdModel,
+  getGroupPermissionsModel,
+  getGroupsModel,
+} from "../model/group.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 export const createGroup = async (req, res) => {
@@ -25,5 +31,60 @@ export const getGroups = async (req, res) => {
     return successResponse(res, "Groups fetched successfully", groups);
   } catch (error) {
     return errorResponse(res, "Failed to fetch groups", 500, error.message);
+  }
+};
+
+export const getGroupPermissions = async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const group = await getGroupByIdModel(groupId);
+
+    if (!group) {
+      return errorResponse(res, "Group not found", 404);
+    }
+
+    const permissions = await getGroupPermissionsModel(groupId);
+
+    return successResponse(
+      res,
+      "Group permissions fetched successfully",
+      {
+        group_id: group.id,
+        group_name: group.group_name,
+        permissions,
+      }
+    );
+  } catch (error) {
+    return errorResponse(res, "Failed to fetch group permissions", 500, error.message);
+  }
+};
+
+export const getAvailableGroupPermissions = async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const group = await getGroupByIdModel(groupId);
+
+    if (!group) {
+      return errorResponse(res, "Group not found", 404);
+    }
+
+    const permissions = await getAvailableGroupPermissionsModel(groupId);
+
+    return successResponse(
+      res,
+      "Available group permissions fetched successfully",
+      {
+        group_id: group.id,
+        group_name: group.group_name,
+        permissions,
+      }
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      "Failed to fetch available group permissions",
+      500,
+      error.message
+    );
   }
 };

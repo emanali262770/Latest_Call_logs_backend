@@ -1,6 +1,7 @@
 import {
   assignPermissionToGroupModel,
   assignGroupToUserModel,
+  getUserGroupsModel,
   getUserPermissionsModel,
 } from "../model/access.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
@@ -54,14 +55,29 @@ export const assignGroupToUser = async (req, res) => {
       return errorResponse(res, "user_id and group_id are required", 400);
     }
 
-    await assignGroupToUserModel(user_id, group_id);
+    const result = await assignGroupToUserModel(user_id, group_id);
 
     return successResponse(res, "Group assigned to user successfully", {
       user_id,
       group_id,
+      assigned: result.affectedRows > 0,
     });
   } catch (error) {
     return errorResponse(res, "Failed to assign group to user", 500, error.message);
+  }
+};
+
+export const getUserGroups = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const groups = await getUserGroupsModel(userId);
+
+    return successResponse(res, "User groups fetched successfully", {
+      user_id: Number(userId),
+      groups,
+    });
+  } catch (error) {
+    return errorResponse(res, "Failed to fetch user groups", 500, error.message);
   }
 };
 

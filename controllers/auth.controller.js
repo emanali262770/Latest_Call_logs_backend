@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { generateToken } from "../utils/jwt.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 import { db } from "../config/db.js";
+import { getUserPermissionsModel } from "../model/access.model.js";
 import { getUserByUsernameModel } from "../model/user.model.js";
 
 export const login = async (req, res) => {
@@ -29,18 +30,30 @@ export const login = async (req, res) => {
       return errorResponse(res, "Invalid credentials", 401);
     }
 
+    const resolvedUsername = user.username ?? user.UserName;
+
     const token = generateToken({
       id: user.id,
-      username: user.UserName,
+      username: resolvedUsername,
       employee_id: user.employee_id,
     });
+
+    const permissionRows = await getUserPermissionsModel(user.id);
+    const permissions = permissionRows.map((row) => ({
+      permission_id: row.permission_id,
+      key_name: row.key_name,
+      module: row.module,
+      sub_module: row.sub_module,
+      action: row.action,
+    }));
 
     return successResponse(res, "Login successful", {
       token,
       user: {
         id: user.id,
-        username: user.UserName,
+        username: resolvedUsername,
         employee_id: user.employee_id,
+        permissions,
       },
     });
   } catch (error) {
