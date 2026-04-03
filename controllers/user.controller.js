@@ -16,8 +16,9 @@ import { successResponse, errorResponse } from "../utils/apiResponse.js";
 export const createUser = async (req, res) => {
   try {
     const { username, password, employee_id, status } = req.body;
+    const normalizedUsername = username?.trim();
 
-    if (!username || !password || !employee_id) {
+    if (!normalizedUsername || !password || !employee_id) {
       return errorResponse(res, "username, password and employee_id are required", 400);
     }
 
@@ -33,7 +34,7 @@ export const createUser = async (req, res) => {
       return errorResponse(res, "This employee already has a user account", 409);
     }
 
-    const existingUsername = await getUserByUsernameModel(username);
+    const existingUsername = await getUserByUsernameModel(normalizedUsername);
 
     if (existingUsername) {
       return errorResponse(res, "Username already exists", 409);
@@ -42,7 +43,7 @@ export const createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await createUserModel({
-      username,
+      username: normalizedUsername,
       password: hashedPassword,
       employee_id,
       status,
@@ -52,6 +53,10 @@ export const createUser = async (req, res) => {
       user_id: result.insertId,
     }, 201);
   } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      return errorResponse(res, "Username already exists", 409);
+    }
+
     return errorResponse(res, "Failed to create user", 500, error.message);
   }
 };
@@ -86,6 +91,7 @@ export const updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
     const { username, password, status } = req.body;
+    const normalizedUsername = username?.trim();
 
     const user = await getUserByIdModel(userId);
 
@@ -93,8 +99,11 @@ export const updateUser = async (req, res) => {
       return errorResponse(res, "User not found", 404);
     }
 
-    if (username && username !== user.UserName) {
-      const existingUsername = await getUserByUsernameModel(username);
+    if (
+      normalizedUsername &&
+      normalizedUsername.toLowerCase() !== String(user.UserName).trim().toLowerCase()
+    ) {
+      const existingUsername = await getUserByUsernameModel(normalizedUsername);
 
       if (existingUsername && existingUsername.id !== Number(userId)) {
         return errorResponse(res, "Username already exists", 409);
@@ -109,13 +118,17 @@ export const updateUser = async (req, res) => {
 
     await updateUserModel({
       id: userId,
-      username: username || user.UserName,
+      username: normalizedUsername || user.UserName,
       password: hashedPassword,
       status: status || user.status,
     });
 
     return successResponse(res, "User updated successfully");
   } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      return errorResponse(res, "Username already exists", 409);
+    }
+
     return errorResponse(res, "Failed to update user", 500, error.message);
   }
 };

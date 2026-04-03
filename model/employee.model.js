@@ -110,6 +110,35 @@ export const getEmployeeByIdModel = async (id) => {
   return rows[0];
 };
 
+export const getEmployeeByNameModel = async (employeeName) => {
+  const [rows] = await db.execute(
+    `
+    SELECT *
+    FROM employees
+    WHERE LOWER(TRIM(COALESCE(employee_name, first_name))) = LOWER(TRIM(?))
+    LIMIT 1
+    `,
+    [employeeName]
+  );
+
+  return rows[0];
+};
+
+export const getEmployeeByEmpIdModel = async (empId) => {
+  const [rows] = await db.execute(
+    `
+    SELECT *
+    FROM employees
+    WHERE emp_id IS NOT NULL
+      AND LOWER(TRIM(emp_id)) = LOWER(TRIM(?))
+    LIMIT 1
+    `,
+    [empId]
+  );
+
+  return rows[0];
+};
+
 export const updateEmployeeModel = async ({
   id,
   emp_id,

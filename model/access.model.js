@@ -1,21 +1,35 @@
 import { db } from "../config/db.js";
 
 export const assignPermissionToGroupModel = async (group_id, permission_ids) => {
-  // permission_ids is always an array
   const ids = Array.isArray(permission_ids) ? permission_ids : [permission_ids];
 
-  for (const permission_id of ids) {
-    await db.execute(
-      `INSERT INTO group_permissions (group_id, permission_id)
-       SELECT ?, ? FROM DUAL
-       WHERE NOT EXISTS (
-         SELECT 1 FROM group_permissions WHERE group_id = ? AND permission_id = ?
-       )`,
-      [group_id, permission_id, group_id, permission_id]
-    );
-  }
+  const connection = await db.getConnection();
 
-  return { assigned: ids.length };
+  try {
+    await connection.beginTransaction();
+
+    // Remove all existing permissions for this group
+    await connection.execute(
+      `DELETE FROM group_permissions WHERE group_id = ?`,
+      [group_id]
+    );
+
+    // Insert only the new permissions
+    for (const permission_id of ids) {
+      await connection.execute(
+        `INSERT INTO group_permissions (group_id, permission_id) VALUES (?, ?)`,
+        [group_id, permission_id]
+      );
+    }
+
+    await connection.commit();
+    return { assigned: ids.length };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 export const assignGroupToUserModel = async (user_id, group_id) => {

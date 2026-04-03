@@ -68,7 +68,7 @@ export const getUserByUsernameModel = async (username) => {
     `
     SELECT *
     FROM users
-    WHERE UserName = ?
+    WHERE LOWER(TRIM(UserName)) = LOWER(TRIM(?))
     LIMIT 1
     `,
     [username]

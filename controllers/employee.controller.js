@@ -2,7 +2,9 @@ import {
   createEmployeeModel,
   generateEmployeeCodeModel,
   getEmployeesModel,
+  getEmployeeByEmpIdModel,
   getEmployeeByIdModel,
+  getEmployeeByNameModel,
   updateEmployeeModel,
 } from "../model/employee.model.js";
 import { getDepartmentByNameModel } from "../model/department.model.js";
@@ -87,6 +89,22 @@ export const createEmployee = async (req, res) => {
       return errorResponse(res, "employee_name is required", 400);
     }
 
+    const normalizedEmployeeName = employee_name.trim();
+
+    if (emp_id?.trim()) {
+      const existingEmployeeCode = await getEmployeeByEmpIdModel(emp_id.trim());
+
+      if (existingEmployeeCode) {
+        return errorResponse(res, "Employee code already exists", 409);
+      }
+    }
+
+    const existingEmployee = await getEmployeeByNameModel(normalizedEmployeeName);
+
+    if (existingEmployee) {
+      return errorResponse(res, "Employee name already exists", 409);
+    }
+
     if (department) {
       const existingDepartment = await getDepartmentByNameModel(department);
 
@@ -134,8 +152,8 @@ export const createEmployee = async (req, res) => {
 
     const result = await createEmployeeModel({
       emp_id: nextEmpId,
-      employee_name: employee_name.trim(),
-      first_name: employee_name.trim(),
+      employee_name: normalizedEmployeeName,
+      first_name: normalizedEmployeeName,
       last_name: null,
       profile_image: toNullable(uploadedProfileImage || profile_image),
       father_name: toNullable(father_name),
@@ -164,6 +182,10 @@ export const createEmployee = async (req, res) => {
       emp_id: nextEmpId,
     }, 201);
   } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      return errorResponse(res, "Duplicate employee data already exists", 409);
+    }
+
     return errorResponse(res, "Failed to create employee", 500, error.message);
   }
 };
@@ -275,14 +297,38 @@ export const updateEmployee = async (req, res) => {
       }
     }
 
-    const nextEmployeeName = employee_name?.trim() || employee.employee_name || employee.first_name;
+    const nextEmpId = emp_id?.trim() || employee.emp_id;
+    const currentEmployeeName = employee.employee_name || employee.first_name || "";
+    const nextEmployeeName = employee_name?.trim() || currentEmployeeName;
     const nextStatus = typeof enabled === "boolean"
       ? (enabled ? "active" : "inactive")
       : (status || employee.status);
 
+    if (
+      nextEmpId &&
+      String(nextEmpId).trim().toLowerCase() !== String(employee.emp_id ?? "").trim().toLowerCase()
+    ) {
+      const existingEmployeeCode = await getEmployeeByEmpIdModel(nextEmpId);
+
+      if (existingEmployeeCode && existingEmployeeCode.id !== Number(employeeId)) {
+        return errorResponse(res, "Employee code already exists", 409);
+      }
+    }
+
+    if (
+      nextEmployeeName &&
+      nextEmployeeName.trim().toLowerCase() !== String(currentEmployeeName).trim().toLowerCase()
+    ) {
+      const existingEmployee = await getEmployeeByNameModel(nextEmployeeName);
+
+      if (existingEmployee && existingEmployee.id !== Number(employeeId)) {
+        return errorResponse(res, "Employee name already exists", 409);
+      }
+    }
+
     await updateEmployeeModel({
       id: employeeId,
-      emp_id: emp_id?.trim() || employee.emp_id,
+      emp_id: nextEmpId,
       employee_name: nextEmployeeName,
       first_name: nextEmployeeName,
       last_name: employee.last_name ?? null,
@@ -318,6 +364,10 @@ export const updateEmployee = async (req, res) => {
       normalizeEmployee(updatedEmployee)
     );
   } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      return errorResponse(res, "Duplicate employee data already exists", 409);
+    }
+
     return errorResponse(res, "Failed to update employee", 500, error.message);
   }
 };
