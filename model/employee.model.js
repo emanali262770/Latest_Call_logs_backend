@@ -139,6 +139,21 @@ export const getEmployeeByEmpIdModel = async (empId) => {
   return rows[0];
 };
 
+export const getEmployeeByDesignationModel = async (designation) => {
+  const [rows] = await db.execute(
+    `
+    SELECT *
+    FROM employees
+    WHERE designation IS NOT NULL
+      AND LOWER(TRIM(designation)) = LOWER(TRIM(?))
+    LIMIT 1
+    `,
+    [designation]
+  );
+
+  return rows[0];
+};
+
 export const updateEmployeeModel = async ({
   id,
   emp_id,

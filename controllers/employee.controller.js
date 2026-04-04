@@ -1,6 +1,7 @@
 import {
   createEmployeeModel,
   generateEmployeeCodeModel,
+  getEmployeeByDesignationModel,
   getEmployeesModel,
   getEmployeeByEmpIdModel,
   getEmployeeByIdModel,
@@ -32,6 +33,62 @@ const toNullable = (value) => {
   }
 
   return value;
+};
+
+const getMissingRequiredEmployeeField = (fields) => {
+  const requiredFields = [
+    ["employee_name", fields.employee_name],
+    ["address", fields.address],
+    ["city", fields.city],
+    ["sex", fields.sex],
+    ["phone", fields.phone],
+    ["email", fields.email],
+    ["cnic_no", fields.cnic_no],
+    ["department", fields.department],
+    ["designation", fields.designation],
+    ["employee_type", fields.employee_type],
+    ["duty_shift", fields.duty_shift],
+    ["bank", fields.bank],
+    ["account_number", fields.account_number],
+  ];
+
+  for (const [fieldName, fieldValue] of requiredFields) {
+    if (typeof fieldValue === "string") {
+      if (!fieldValue.trim()) {
+        return fieldName;
+      }
+      continue;
+    }
+
+    if (fieldValue === undefined || fieldValue === null) {
+      return fieldName;
+    }
+  }
+
+  return null;
+};
+
+const SUPER_ADMIN_DESIGNATION = "super admin";
+
+const hasSuperAdminDesignation = (designation) =>
+  typeof designation === "string" &&
+  designation.trim().toLowerCase() === SUPER_ADMIN_DESIGNATION;
+
+const ensureSingleSuperAdminDesignation = async (designation, currentEmployeeId = null) => {
+  if (!hasSuperAdminDesignation(designation)) {
+    return null;
+  }
+
+  const existingSuperAdmin = await getEmployeeByDesignationModel(designation);
+
+  if (
+    existingSuperAdmin &&
+    existingSuperAdmin.id !== Number(currentEmployeeId)
+  ) {
+    return "Admin already exists with designation of Super Admin";
+  }
+
+  return null;
 };
 
 const getCloudinaryPublicId = (imageUrl) => {
@@ -85,8 +142,24 @@ export const createEmployee = async (req, res) => {
       enabled,
     } = req.body;
 
-    if (!employee_name?.trim()) {
-      return errorResponse(res, "employee_name is required", 400);
+    const missingRequiredField = getMissingRequiredEmployeeField({
+      employee_name,
+      address,
+      city,
+      sex,
+      phone,
+      email,
+      cnic_no,
+      department,
+      designation,
+      employee_type,
+      duty_shift,
+      bank,
+      account_number,
+    });
+
+    if (missingRequiredField) {
+      return errorResponse(res, `${missingRequiredField} is required`, 400);
     }
 
     const normalizedEmployeeName = employee_name.trim();
@@ -118,6 +191,12 @@ export const createEmployee = async (req, res) => {
 
       if (!existingDesignation || existingDesignation.status === "inactive") {
         return errorResponse(res, "Selected designation does not exist", 400);
+      }
+
+      const superAdminError = await ensureSingleSuperAdminDesignation(designation);
+
+      if (superAdminError) {
+        return errorResponse(res, superAdminError, 409);
       }
     }
 
@@ -271,6 +350,15 @@ export const updateEmployee = async (req, res) => {
       if (!existingDesignation || existingDesignation.status === "inactive") {
         return errorResponse(res, "Selected designation does not exist", 400);
       }
+
+      const superAdminError = await ensureSingleSuperAdminDesignation(
+        designation,
+        employeeId
+      );
+
+      if (superAdminError) {
+        return errorResponse(res, superAdminError, 409);
+      }
     }
 
     if (employee_type) {
@@ -300,9 +388,41 @@ export const updateEmployee = async (req, res) => {
     const nextEmpId = emp_id?.trim() || employee.emp_id;
     const currentEmployeeName = employee.employee_name || employee.first_name || "";
     const nextEmployeeName = employee_name?.trim() || currentEmployeeName;
+    const nextAddress = address ?? employee.address;
+    const nextCity = city ?? employee.city;
+    const nextSex = sex ?? employee.sex;
+    const nextPhone = phone ?? employee.phone;
+    const nextEmail = email ?? employee.email;
+    const nextCnicNo = cnic_no ?? employee.cnic_no;
+    const nextDepartment = department ?? employee.department;
+    const nextDesignation = designation ?? employee.designation;
+    const nextEmployeeType = employee_type ?? employee.employee_type;
+    const nextDutyShift = duty_shift ?? employee.duty_shift;
+    const nextBank = bank ?? employee.bank;
+    const nextAccountNumber = account_number ?? employee.account_number;
     const nextStatus = typeof enabled === "boolean"
       ? (enabled ? "active" : "inactive")
       : (status || employee.status);
+
+    const missingRequiredField = getMissingRequiredEmployeeField({
+      employee_name: nextEmployeeName,
+      address: nextAddress,
+      city: nextCity,
+      sex: nextSex,
+      phone: nextPhone,
+      email: nextEmail,
+      cnic_no: nextCnicNo,
+      department: nextDepartment,
+      designation: nextDesignation,
+      employee_type: nextEmployeeType,
+      duty_shift: nextDutyShift,
+      bank: nextBank,
+      account_number: nextAccountNumber,
+    });
+
+    if (missingRequiredField) {
+      return errorResponse(res, `${missingRequiredField} is required`, 400);
+    }
 
     if (
       nextEmpId &&
@@ -336,23 +456,23 @@ export const updateEmployee = async (req, res) => {
         uploadedProfileImage || profile_image || employee.profile_image
       ),
       father_name: toNullable(father_name ?? employee.father_name),
-      address: toNullable(address ?? employee.address),
-      city: toNullable(city ?? employee.city),
-      sex: toNullable(sex ?? employee.sex),
-      email: toNullable(email ?? employee.email),
-      phone: toNullable(phone ?? employee.phone),
+      address: toNullable(nextAddress),
+      city: toNullable(nextCity),
+      sex: toNullable(nextSex),
+      email: toNullable(nextEmail),
+      phone: toNullable(nextPhone),
       mobile: toNullable(mobile ?? employee.mobile),
-      cnic_no: toNullable(cnic_no ?? employee.cnic_no),
+      cnic_no: toNullable(nextCnicNo),
       date_of_birth: toNullable(date_of_birth ?? employee.date_of_birth),
       qualification: toNullable(qualification ?? employee.qualification),
       blood_group: toNullable(blood_group ?? employee.blood_group),
-      designation: toNullable(designation ?? employee.designation),
-      department: toNullable(department ?? employee.department),
-      employee_type: toNullable(employee_type ?? employee.employee_type),
+      designation: toNullable(nextDesignation),
+      department: toNullable(nextDepartment),
+      employee_type: toNullable(nextEmployeeType),
       hiring_date: toNullable(hiring_date ?? employee.hiring_date),
-      duty_shift: toNullable(duty_shift ?? employee.duty_shift),
-      bank: toNullable(bank ?? employee.bank),
-      account_number: toNullable(account_number ?? employee.account_number),
+      duty_shift: toNullable(nextDutyShift),
+      bank: toNullable(nextBank),
+      account_number: toNullable(nextAccountNumber),
       status: nextStatus,
     });
 
