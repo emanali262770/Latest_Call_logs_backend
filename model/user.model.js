@@ -1,18 +1,34 @@
 import { db } from "../config/db.js";
 
+export const generateUserCodeModel = async () => {
+  const [rows] = await db.execute(
+    `
+    SELECT id
+    FROM users
+    ORDER BY id DESC
+    LIMIT 1
+    `
+  );
+
+  const nextUserNumber = (rows[0]?.id || 0) + 1;
+  return `USR-${String(nextUserNumber).padStart(5, "0")}`;
+};
+
 // CREATE USER
 export const createUserModel = async ({
+  user_id,
   username,
   password,
   employee_id,
   status,
+  is_locked,
 }) => {
   const [result] = await db.execute(
     `
-    INSERT INTO users (UserName, password, employee_id, status)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (user_id, UserName, password, employee_id, status, is_locked)
+    VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [username, password, employee_id, status || "active"]
+    [user_id, username, password, employee_id, status || "active", is_locked ? 1 : 0]
   );
 
   return result;
@@ -24,8 +40,10 @@ export const getUsersModel = async () => {
     `
     SELECT 
       u.id,
+      u.user_id,
       u.UserName,
       u.status,
+      u.is_locked,
       u.employee_id,
       u.created_at AS createdAt,
       COALESCE(e.employee_name, e.first_name) AS employee_name,
@@ -104,15 +122,34 @@ export const updateUserPasswordModel = async ({ id, password }) => {
   return result;
 };
 
-// UPDATE USER
-export const updateUserModel = async ({ id, username, password, status }) => {
+export const updateUserLockModel = async ({ id, is_locked, status }) => {
   const [result] = await db.execute(
     `
     UPDATE users
-    SET UserName = ?, password = ?, status = ?
+    SET is_locked = ?, status = ?
     WHERE id = ?
     `,
-    [username, password, status, id]
+    [is_locked ? 1 : 0, status, id]
+  );
+
+  return result;
+};
+
+// UPDATE USER
+export const updateUserModel = async ({
+  id,
+  username,
+  password,
+  status,
+  is_locked,
+}) => {
+  const [result] = await db.execute(
+    `
+    UPDATE users
+    SET UserName = ?, password = ?, status = ?, is_locked = ?
+    WHERE id = ?
+    `,
+    [username, password, status, is_locked ? 1 : 0, id]
   );
 
   return result;

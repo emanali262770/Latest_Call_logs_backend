@@ -43,6 +43,20 @@ const getNextEmployeeCode = async () => {
   return `EMP-${String(nextEmployeeNumber).padStart(5, "0")}`;
 };
 
+const getNextUserCode = async () => {
+  const [rows] = await db.execute(
+    `
+    SELECT id
+    FROM users
+    ORDER BY id DESC
+    LIMIT 1
+    `
+  );
+
+  const nextUserNumber = (rows[0]?.id || 0) + 1;
+  return `USR-${String(nextUserNumber).padStart(5, "0")}`;
+};
+
 const runSeeder = async () => {
   try {
     console.log("Seeding Admin...");
@@ -133,13 +147,14 @@ const runSeeder = async () => {
       console.log("Employee created:", employeeId);
 
       const hashedPassword = await bcrypt.hash("123456", 10);
+      const nextUserId = await getNextUserCode();
 
       const [userResult] = await db.execute(
         `
-        INSERT INTO users (UserName, password, employee_id, status)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (user_id, UserName, password, employee_id, status, is_locked)
+        VALUES (?, ?, ?, ?, ?, ?)
         `,
-        ["admin", hashedPassword, employeeId, "active"]
+        [nextUserId, "admin", hashedPassword, employeeId, "active", 0]
       );
 
       userId = userResult.insertId;

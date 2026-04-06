@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from 'express';
 import cors from 'cors';
+import path from "path";
+import { fileURLToPath } from "url";
 
 import { connectDB } from './config/db.js';
 
@@ -16,12 +18,16 @@ import designationRoutes from './routes/designation.routes.js';
 import employeeTypeRoutes from './routes/employeeType.routes.js';
 import dutyShiftRoutes from './routes/dutyShift.routes.js';
 import bankRoutes from './routes/bank.routes.js';
+import companyRoutes from './routes/company.routes.js';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get('/', (req, res) => {
  res.status(200).json({ message: 'Welcome to the Call Logs API' });
@@ -39,6 +45,7 @@ app.use('/api/designations', designationRoutes);
 app.use('/api/employee-types', employeeTypeRoutes);
 app.use('/api/duty-shifts', dutyShiftRoutes);
 app.use('/api/banks', bankRoutes);
+app.use('/api/company', companyRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Request error:", err);

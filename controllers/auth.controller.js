@@ -1,9 +1,11 @@
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 import { generateToken } from "../utils/jwt.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 import { db } from "../config/db.js";
 import { getUserPermissionsModel } from "../model/access.model.js";
+import { getCompanySummaryModel } from "../model/company.model.js";
 import { getUserByUsernameModel } from "../model/user.model.js";
 
 export const login = async (req, res) => {
@@ -18,6 +20,10 @@ export const login = async (req, res) => {
 
     if (!user) {
       return errorResponse(res, "Invalid credentials", 401);
+    }
+
+    if (user.is_locked) {
+      return errorResponse(res, "User is locked and cannot login", 403);
     }
 
     if (user.status !== "active") {
@@ -46,6 +52,7 @@ export const login = async (req, res) => {
       sub_module: row.sub_module,
       action: row.action,
     }));
+    const company = await getCompanySummaryModel();
 
     return successResponse(res, "Login successful", {
       token,
@@ -55,6 +62,7 @@ export const login = async (req, res) => {
         employee_id: user.employee_id,
         permissions,
       },
+      company,
     });
   } catch (error) {
     return errorResponse(res, "Login failed", 500, error.message);
@@ -67,8 +75,10 @@ export const me = async (req, res) => {
       `
       SELECT 
         u.id,
+        u.user_id,
         u.UserName,
         u.status,
+        u.is_locked,
         u.employee_id,
         COALESCE(e.employee_name, e.first_name) AS employee_name,
         e.first_name,
@@ -87,8 +97,47 @@ export const me = async (req, res) => {
       return errorResponse(res, "User not found", 404);
     }
 
-    return successResponse(res, "Profile fetched successfully", rows[0]);
+    const company = await getCompanySummaryModel();
+
+    return successResponse(res, "Profile fetched successfully", {
+      ...rows[0],
+      company,
+    });
   } catch (error) {
     return errorResponse(res, "Failed to fetch profile", 500, error.message);
+  }
+};
+
+export const checkToken = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return errorResponse(res, "Unauthorized, token missing", 401, {
+        isExpired: true,
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const company = await getCompanySummaryModel();
+
+    return successResponse(res, "Token is valid", {
+      isExpired: false,
+      expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
+      user: decoded,
+      company,
+    });
+  } catch (error) {
+    const isExpired = error.name === "TokenExpiredError";
+
+    return errorResponse(
+      res,
+      isExpired ? "Token has expired" : "Invalid token",
+      401,
+      {
+        isExpired,
+      }
+    );
   }
 };

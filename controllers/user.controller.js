@@ -2,20 +2,43 @@ import bcrypt from "bcryptjs";
 import { db } from "../config/db.js";
 import {
   createUserModel,
+  generateUserCodeModel,
   getUsersModel,
   getUserByIdModel,
   getUserByEmployeeIdModel,
   getUserByUsernameModel,
+  updateUserLockModel,
   updateUserPasswordModel,
   updateUserModel,
 } from "../model/user.model.js";
 import { getEmployeeByIdModel } from "../model/employee.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
+const normalizeLockValue = (value, fallback = false) => {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  if (typeof value === "string") {
+    const normalizedValue = value.trim().toLowerCase();
+    return ["1", "true", "yes", "y", "locked"].includes(normalizedValue);
+  }
+
+  return fallback;
+};
+
 // CREATE USER
 export const createUser = async (req, res) => {
   try {
-    const { username, password, employee_id, status } = req.body;
+    const { username, password, employee_id, status, lock, locked, is_locked } = req.body;
     const normalizedUsername = username?.trim();
 
     if (!normalizedUsername || !password || !employee_id) {
@@ -41,19 +64,31 @@ export const createUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const nextUserId = await generateUserCodeModel();
+    const nextIsLocked = normalizeLockValue(
+      lock ?? locked ?? is_locked,
+      false
+    );
 
     const result = await createUserModel({
+      user_id: nextUserId,
       username: normalizedUsername,
       password: hashedPassword,
       employee_id,
       status,
+      is_locked: nextIsLocked,
     });
 
     return successResponse(res, "User created successfully", {
-      user_id: result.insertId,
+      id: result.insertId,
+      user_id: nextUserId,
     }, 201);
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
+      if (error.message?.includes("user_id")) {
+        return errorResponse(res, "Generated user ID already exists", 409);
+      }
+
       return errorResponse(res, "Username already exists", 409);
     }
 
@@ -90,7 +125,7 @@ export const getUserById = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { username, password, status } = req.body;
+    const { username, password, status, lock, locked, is_locked } = req.body;
     const normalizedUsername = username?.trim();
 
     const user = await getUserByIdModel(userId);
@@ -116,11 +151,17 @@ export const updateUser = async (req, res) => {
       hashedPassword = await bcrypt.hash(password, 10);
     }
 
+    const nextIsLocked = normalizeLockValue(
+      lock ?? locked ?? is_locked,
+      Boolean(user.is_locked)
+    );
+
     await updateUserModel({
       id: userId,
       username: normalizedUsername || user.UserName,
       password: hashedPassword,
       status: status || user.status,
+      is_locked: nextIsLocked,
     });
 
     return successResponse(res, "User updated successfully");
@@ -159,6 +200,48 @@ export const changeUserPassword = async (req, res) => {
     return successResponse(res, "Password changed successfully");
   } catch (error) {
     return errorResponse(res, "Failed to change password", 500, error.message);
+  }
+};
+
+export const updateUserLock = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { lock, locked, is_locked } = req.body;
+
+    if (lock === undefined && locked === undefined && is_locked === undefined) {
+      return errorResponse(res, "lock is required", 400);
+    }
+
+    const user = await getUserByIdModel(userId);
+
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
+
+    const nextIsLocked = normalizeLockValue(
+      lock ?? locked ?? is_locked,
+      Boolean(user.is_locked)
+    );
+    const nextStatus = nextIsLocked ? "inactive" : "active";
+
+    await updateUserLockModel({
+      id: userId,
+      is_locked: nextIsLocked,
+      status: nextStatus,
+    });
+
+    return successResponse(
+      res,
+      nextIsLocked ? "User locked successfully" : "User unlocked successfully",
+      {
+        id: user.id,
+        user_id: user.user_id,
+        is_locked: nextIsLocked,
+        status: nextStatus,
+      }
+    );
+  } catch (error) {
+    return errorResponse(res, "Failed to update user lock", 500, error.message);
   }
 };
 

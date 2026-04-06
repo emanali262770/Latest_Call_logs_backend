@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS companies (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  company_id VARCHAR(50) NOT NULL UNIQUE,
+  company_logo VARCHAR(500) NULL,
+  company_name VARCHAR(255) NOT NULL,
+  phone VARCHAR(50) NOT NULL,
+  email VARCHAR(255) NULL,
+  website VARCHAR(255) NULL,
+  address TEXT NOT NULL,
+  representative VARCHAR(255) NOT NULL,
+  department VARCHAR(255) NOT NULL,
+  designation VARCHAR(255) NOT NULL,
+  mobile_no VARCHAR(50) NOT NULL,
+  ntn VARCHAR(100) NOT NULL,
+  ntn_document VARCHAR(500) NULL,
+  strn VARCHAR(100) NOT NULL,
+  strn_document VARCHAR(500) NULL,
+  year_of_establishment DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

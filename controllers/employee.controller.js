@@ -14,8 +14,8 @@ import { getEmployeeTypeByNameModel } from "../model/employeeType.model.js";
 import { getDutyShiftByNameModel } from "../model/dutyShift.model.js";
 import { getBankByNameModel } from "../model/bank.model.js";
 import { db } from "../config/db.js";
-import cloudinary from "../config/cloudinary.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
+import { removeLocalFile, toPublicUploadUrl } from "../utils/localFiles.js";
 
 const normalizeEmployee = (employee) => ({
   ...employee,
@@ -91,31 +91,9 @@ const ensureSingleSuperAdminDesignation = async (designation, currentEmployeeId 
   return null;
 };
 
-const getCloudinaryPublicId = (imageUrl) => {
-  if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.includes("cloudinary")) {
-    return null;
-  }
-
-  const uploadSegment = "/upload/";
-  const uploadIndex = imageUrl.indexOf(uploadSegment);
-
-  if (uploadIndex === -1) {
-    return null;
-  }
-
-  let publicIdWithExtension = imageUrl.slice(uploadIndex + uploadSegment.length);
-  const versionMatch = publicIdWithExtension.match(/^v\d+\//);
-
-  if (versionMatch) {
-    publicIdWithExtension = publicIdWithExtension.slice(versionMatch[0].length);
-  }
-
-  return publicIdWithExtension.replace(/\.[^.]+$/, "");
-};
-
 export const createEmployee = async (req, res) => {
   try {
-    const uploadedProfileImage = req.file?.path || req.file?.secure_url || null;
+    const uploadedProfileImage = toPublicUploadUrl(req.file?.path);
     const {
       emp_id,
       employee_name,
@@ -302,7 +280,7 @@ export const getEmployeeById = async (req, res) => {
 
 export const updateEmployee = async (req, res) => {
   try {
-    const uploadedProfileImage = req.file?.path || req.file?.secure_url || null;
+    const uploadedProfileImage = toPublicUploadUrl(req.file?.path);
     const employeeId = req.params.id;
     const {
       emp_id,
@@ -335,6 +313,8 @@ export const updateEmployee = async (req, res) => {
     if (!employee) {
       return errorResponse(res, "Employee not found", 404);
     }
+
+    const previousProfileImage = employee.profile_image;
 
     if (department) {
       const existingDepartment = await getDepartmentByNameModel(department);
@@ -476,6 +456,14 @@ export const updateEmployee = async (req, res) => {
       status: nextStatus,
     });
 
+    if (
+      uploadedProfileImage &&
+      previousProfileImage &&
+      previousProfileImage !== uploadedProfileImage
+    ) {
+      await removeLocalFile(previousProfileImage);
+    }
+
     const updatedEmployee = await getEmployeeByIdModel(employeeId);
 
     return successResponse(
@@ -533,16 +521,7 @@ export const deleteEmployee = async (req, res) => {
 
     await connection.execute(`DELETE FROM employees WHERE id = ?`, [employeeId]);
     await connection.commit();
-
-    const publicId = getCloudinaryPublicId(employeeRows[0].profile_image);
-
-    if (publicId) {
-      try {
-        await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
-      } catch (cloudinaryError) {
-        console.error("Cloudinary cleanup failed:", cloudinaryError);
-      }
-    }
+    await removeLocalFile(employeeRows[0].profile_image);
 
     return successResponse(res, "Employee deleted successfully");
   } catch (error) {

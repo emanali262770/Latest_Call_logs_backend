@@ -8,6 +8,7 @@ import {
   changeUserPassword,
   getUsers,
   getUserById,
+  updateUserLock,
   updateUser,
   deleteUser,
 } from "../controllers/user.controller.js";
@@ -36,6 +37,14 @@ router.put(
   protect,
   checkPermission("ACCESS.USERS.UPDATE"),
   changeUserPassword
+);
+
+// LOCK OR UNLOCK USER
+router.patch(
+  "/:id/lock",
+  protect,
+  checkPermission("ACCESS.USERS.UPDATE"),
+  updateUserLock
 );
 
 // GET SINGLE USER

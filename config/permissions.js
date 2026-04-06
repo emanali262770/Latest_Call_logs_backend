@@ -237,4 +237,18 @@ export const ALL_PERMISSIONS = [
     key_name: "ACCESS.PERMISSIONS.ASSIGN",
     description: "Assign permission to group",
   },
+  {
+    module: "SETUP",
+    sub_module: "COMPANY",
+    action: "READ",
+    key_name: "SETUP.COMPANY.READ",
+    description: "Read company profile",
+  },
+  {
+    module: "SETUP",
+    sub_module: "COMPANY",
+    action: "UPDATE",
+    key_name: "SETUP.COMPANY.UPDATE",
+    description: "Update company profile",
+  },
 ];
