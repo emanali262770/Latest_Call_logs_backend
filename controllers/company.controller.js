@@ -24,6 +24,23 @@ const toNullable = (value) => {
   return value;
 };
 
+const toBoolean = (value) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  if (typeof value === "string") {
+    const normalizedValue = value.trim().toLowerCase();
+    return ["true", "1", "yes", "on"].includes(normalizedValue);
+  }
+
+  return false;
+};
+
 const getMissingRequiredField = (fields) => {
   const requiredFields = [
     ["company_name", fields.company_name],
@@ -81,9 +98,14 @@ export const upsertCompanyProfile = async (req, res) => {
     const companyLogoUrl = toPublicUploadUrl(files.company_logo?.[0]?.path);
     const ntnDocumentUrl = toPublicUploadUrl(files.ntn_document?.[0]?.path);
     const strnDocumentUrl = toPublicUploadUrl(files.strn_document?.[0]?.path);
+    const shouldRemoveCompanyLogo = toBoolean(req.body.remove_company_logo);
+    const shouldRemoveNtnDocument = toBoolean(req.body.remove_ntn_document);
+    const shouldRemoveStrnDocument = toBoolean(req.body.remove_strn_document);
 
     const payload = {
-      company_logo: toNullable(companyLogoUrl || req.body.company_logo || existingCompany?.company_logo),
+      company_logo: shouldRemoveCompanyLogo && !companyLogoUrl
+        ? null
+        : toNullable(companyLogoUrl || req.body.company_logo || existingCompany?.company_logo),
       company_name: toNullable(req.body.company_name ?? existingCompany?.company_name),
       phone: toNullable(req.body.phone ?? existingCompany?.phone),
       email: toNullable(req.body.email ?? existingCompany?.email),
@@ -94,9 +116,13 @@ export const upsertCompanyProfile = async (req, res) => {
       designation: toNullable(req.body.designation ?? existingCompany?.designation),
       mobile_no: toNullable(req.body.mobile_no ?? existingCompany?.mobile_no),
       ntn: toNullable(req.body.ntn ?? existingCompany?.ntn),
-      ntn_document: toNullable(ntnDocumentUrl || req.body.ntn_document || existingCompany?.ntn_document),
+      ntn_document: shouldRemoveNtnDocument && !ntnDocumentUrl
+        ? null
+        : toNullable(ntnDocumentUrl || req.body.ntn_document || existingCompany?.ntn_document),
       strn: toNullable(req.body.strn ?? existingCompany?.strn),
-      strn_document: toNullable(strnDocumentUrl || req.body.strn_document || existingCompany?.strn_document),
+      strn_document: shouldRemoveStrnDocument && !strnDocumentUrl
+        ? null
+        : toNullable(strnDocumentUrl || req.body.strn_document || existingCompany?.strn_document),
       year_of_establishment: toNullable(
         req.body.year_of_establishment ?? existingCompany?.year_of_establishment
       ),
@@ -140,6 +166,14 @@ export const upsertCompanyProfile = async (req, res) => {
     }
 
     if (
+      shouldRemoveCompanyLogo &&
+      !companyLogoUrl &&
+      existingCompany.company_logo
+    ) {
+      await removeLocalFile(existingCompany.company_logo);
+    }
+
+    if (
       ntnDocumentUrl &&
       existingCompany.ntn_document &&
       existingCompany.ntn_document !== ntnDocumentUrl
@@ -148,9 +182,25 @@ export const upsertCompanyProfile = async (req, res) => {
     }
 
     if (
+      shouldRemoveNtnDocument &&
+      !ntnDocumentUrl &&
+      existingCompany.ntn_document
+    ) {
+      await removeLocalFile(existingCompany.ntn_document);
+    }
+
+    if (
       strnDocumentUrl &&
       existingCompany.strn_document &&
       existingCompany.strn_document !== strnDocumentUrl
+    ) {
+      await removeLocalFile(existingCompany.strn_document);
+    }
+
+    if (
+      shouldRemoveStrnDocument &&
+      !strnDocumentUrl &&
+      existingCompany.strn_document
     ) {
       await removeLocalFile(existingCompany.strn_document);
     }
