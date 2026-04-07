@@ -19,6 +19,13 @@ import employeeTypeRoutes from './routes/employeeType.routes.js';
 import dutyShiftRoutes from './routes/dutyShift.routes.js';
 import bankRoutes from './routes/bank.routes.js';
 import companyRoutes from './routes/company.routes.js';
+import itemTypeRoutes from './routes/itemType.routes.js';
+import categoryRoutes from './routes/category.routes.js';
+import subCategoryRoutes from './routes/subCategory.routes.js';
+import manufacturerRoutes from './routes/manufacturer.routes.js';
+import unitRoutes from './routes/unit.routes.js';
+import locationRoutes from './routes/location.routes.js';
+import supplierRoutes from './routes/supplier.routes.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +53,13 @@ app.use('/api/employee-types', employeeTypeRoutes);
 app.use('/api/duty-shifts', dutyShiftRoutes);
 app.use('/api/banks', bankRoutes);
 app.use('/api/company', companyRoutes);
+app.use('/api/item-types', itemTypeRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/sub-categories', subCategoryRoutes);
+app.use('/api/manufacturers', manufacturerRoutes);
+app.use('/api/units', unitRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/suppliers', supplierRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Request error:", err);
