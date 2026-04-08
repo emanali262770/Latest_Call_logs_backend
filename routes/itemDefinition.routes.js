@@ -3,6 +3,7 @@ import {
   createItemDefinition,
   getItemDefinitions,
   getItemDefinitionById,
+  getItemDefinitionByBarcode,
   getLowStockItemDefinitions,
   getLowStockItemDefinitionsCount,
   markLowStockItemDefinitionAsRead,
@@ -22,6 +23,8 @@ router.post(
   uploadItemImage.single("image"),
   createItemDefinition
 );
+
+router.get("/barcode/:barcode", getItemDefinitionByBarcode);
 
 router.get(
   "/low-stock/count",

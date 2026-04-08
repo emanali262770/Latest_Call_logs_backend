@@ -203,10 +203,42 @@ export const getItemDefinitionByItemCodeModel = async (itemCode) => {
 export const getItemDefinitionByBarcodeModel = async (barcode) => {
   const [rows] = await db.execute(
     `
-    SELECT *
-    FROM item_definitions
-    WHERE LOWER(TRIM(COALESCE(primary_barcode, ''))) = LOWER(TRIM(?))
-       OR LOWER(TRIM(COALESCE(secondary_barcode, ''))) = LOWER(TRIM(?))
+    SELECT
+      i.id,
+      i.item_code,
+      i.primary_barcode,
+      i.secondary_barcode,
+      i.item_name,
+      i.unit_qty,
+      i.reorder_level,
+      i.purchase_price,
+      i.sale_price,
+      i.is_expirable,
+      i.expiry_days,
+      i.is_cost_item,
+      i.stop_sale,
+      i.image,
+      i.status,
+      i.created_at,
+      i.updated_at,
+      it.item_type_name,
+      c.category_name,
+      sc.sub_category_name,
+      m.manufacturer_name,
+      s.supplier_name,
+      u.unit_name,
+      u.short_name AS unit_short_name,
+      l.location_name
+    FROM item_definitions i
+    INNER JOIN item_types it ON i.item_type_id = it.id
+    INNER JOIN categories c ON i.category_id = c.id
+    LEFT JOIN sub_categories sc ON i.sub_category_id = sc.id
+    LEFT JOIN manufacturers m ON i.manufacturer_id = m.id
+    LEFT JOIN suppliers s ON i.supplier_id = s.id
+    INNER JOIN units u ON i.unit_id = u.id
+    LEFT JOIN locations l ON i.location_id = l.id
+    WHERE LOWER(TRIM(COALESCE(i.primary_barcode, ''))) = LOWER(TRIM(?))
+       OR LOWER(TRIM(COALESCE(i.secondary_barcode, ''))) = LOWER(TRIM(?))
     LIMIT 1
     `,
     [barcode, barcode]

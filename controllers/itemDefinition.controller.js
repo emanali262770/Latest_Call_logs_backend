@@ -393,6 +393,26 @@ export const getItemDefinitionById = async (req, res) => {
   }
 };
 
+export const getItemDefinitionByBarcode = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+
+    if (!barcode || !barcode.trim()) {
+      return errorResponse(res, "Barcode is required", 400);
+    }
+
+    const itemDefinition = await getItemDefinitionByBarcodeModel(barcode.trim());
+
+    if (!itemDefinition) {
+      return errorResponse(res, "Item definition not found for the given barcode", 404);
+    }
+
+    return successResponse(res, "Item definition fetched successfully", itemDefinition);
+  } catch (error) {
+    return errorResponse(res, "Failed to fetch item definition by barcode", 500, error.message);
+  }
+};
+
 export const getLowStockItemDefinitions = async (req, res) => {
   try {
     const userId = req.user?.id;
