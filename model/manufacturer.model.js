@@ -12,23 +12,30 @@ export const createManufacturerModel = async ({ manufacturer_name, phone, addres
   return result;
 };
 
-export const getManufacturersModel = async (search = "") => {
-  const hasSearch = Boolean(search);
-  const query = hasSearch
-    ? `
-      SELECT *
-      FROM manufacturers
-      WHERE status != 'inactive' AND manufacturer_name LIKE ?
-      ORDER BY id DESC
-    `
-    : `
-      SELECT *
-      FROM manufacturers
-      WHERE status != 'inactive'
-      ORDER BY id DESC
-    `;
+export const getManufacturersModel = async (search = "", status) => {
+  const conditions = [];
+  const params = [];
 
-  const params = hasSearch ? [`%${search}%`] : [];
+  if (search) {
+    conditions.push("manufacturer_name LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+  const query = `
+    SELECT *
+    FROM manufacturers
+    ${whereClause}
+    ORDER BY id DESC
+  `;
+
   const [rows] = await db.execute(query, params);
   return rows;
 };

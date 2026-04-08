@@ -42,7 +42,12 @@ export const createManufacturer = async (req, res) => {
 export const getManufacturers = async (req, res) => {
   try {
     const search = req.query.search?.trim() ?? "";
-    const manufacturers = await getManufacturersModel(search);
+    const requestedStatus = req.query.status?.trim().toLowerCase();
+    const status =
+      requestedStatus === "active" || requestedStatus === "inactive"
+        ? requestedStatus
+        : undefined;
+    const manufacturers = await getManufacturersModel(search, status);
 
     return successResponse(res, "Manufacturers fetched successfully", {
       records: manufacturers.length,

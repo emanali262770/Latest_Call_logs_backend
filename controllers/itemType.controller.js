@@ -41,7 +41,12 @@ export const createItemType = async (req, res) => {
 export const getItemTypes = async (req, res) => {
   try {
     const search = req.query.search?.trim() ?? "";
-    const itemTypes = await getItemTypesModel(search);
+    const requestedStatus = req.query.status?.trim().toLowerCase();
+    const status =
+      requestedStatus === "active" || requestedStatus === "inactive"
+        ? requestedStatus
+        : undefined;
+    const itemTypes = await getItemTypesModel(search, status);
 
     return successResponse(res, "Item types fetched successfully", {
       records: itemTypes.length,
@@ -49,6 +54,25 @@ export const getItemTypes = async (req, res) => {
     });
   } catch (error) {
     return errorResponse(res, "Failed to fetch item types", 500, error.message);
+  }
+};
+
+export const getActiveItemTypes = async (req, res) => {
+  try {
+    const search = req.query.search?.trim() ?? "";
+    const itemTypes = await getItemTypesModel(search, "active");
+
+    return successResponse(res, "Active item types fetched successfully", {
+      records: itemTypes.length,
+      itemTypes,
+    });
+  } catch (error) {
+    return errorResponse(
+      res,
+      "Failed to fetch active item types",
+      500,
+      error.message
+    );
   }
 };
 

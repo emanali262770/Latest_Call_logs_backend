@@ -26,6 +26,7 @@ import manufacturerRoutes from './routes/manufacturer.routes.js';
 import unitRoutes from './routes/unit.routes.js';
 import locationRoutes from './routes/location.routes.js';
 import supplierRoutes from './routes/supplier.routes.js';
+import itemDefinitionRoutes from './routes/itemDefinition.routes.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +61,7 @@ app.use('/api/manufacturers', manufacturerRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/item-definitions', itemDefinitionRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Request error:", err);

@@ -41,7 +41,12 @@ export const createCategory = async (req, res) => {
 export const getCategories = async (req, res) => {
   try {
     const search = req.query.search?.trim() ?? "";
-    const categories = await getCategoriesModel(search);
+    const requestedStatus = req.query.status?.trim().toLowerCase();
+    const status =
+      requestedStatus === "active" || requestedStatus === "inactive"
+        ? requestedStatus
+        : undefined;
+    const categories = await getCategoriesModel(search, status);
 
     return successResponse(res, "Categories fetched successfully", {
       records: categories.length,

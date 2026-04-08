@@ -12,23 +12,30 @@ export const createCategoryModel = async ({ category_name, status }) => {
   return result;
 };
 
-export const getCategoriesModel = async (search = "") => {
-  const hasSearch = Boolean(search);
-  const query = hasSearch
-    ? `
-      SELECT *
-      FROM categories
-      WHERE status != 'inactive' AND category_name LIKE ?
-      ORDER BY id DESC
-    `
-    : `
-      SELECT *
-      FROM categories
-      WHERE status != 'inactive'
-      ORDER BY id DESC
-    `;
+export const getCategoriesModel = async (search = "", status) => {
+  const conditions = [];
+  const params = [];
 
-  const params = hasSearch ? [`%${search}%`] : [];
+  if (search) {
+    conditions.push("category_name LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+  const query = `
+    SELECT *
+    FROM categories
+    ${whereClause}
+    ORDER BY id DESC
+  `;
+
   const [rows] = await db.execute(query, params);
   return rows;
 };

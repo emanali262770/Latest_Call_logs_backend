@@ -12,23 +12,30 @@ export const createSupplierModel = async ({ supplier_name, phone, address, statu
   return result;
 };
 
-export const getSuppliersModel = async (search = "") => {
-  const hasSearch = Boolean(search);
-  const query = hasSearch
-    ? `
-      SELECT id, supplier_name AS name, phone, address, status, created_at, updated_at
-      FROM suppliers
-      WHERE status != 'inactive' AND supplier_name LIKE ?
-      ORDER BY id DESC
-    `
-    : `
-      SELECT id, supplier_name AS name, phone, address, status, created_at, updated_at
-      FROM suppliers
-      WHERE status != 'inactive'
-      ORDER BY id DESC
-    `;
+export const getSuppliersModel = async (search = "", status) => {
+  const conditions = [];
+  const params = [];
 
-  const params = hasSearch ? [`%${search}%`] : [];
+  if (search) {
+    conditions.push("supplier_name LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+  const query = `
+    SELECT id, supplier_name AS name, phone, address, status, created_at, updated_at
+    FROM suppliers
+    ${whereClause}
+    ORDER BY id DESC
+  `;
+
   const [rows] = await db.execute(query, params);
   return rows;
 };

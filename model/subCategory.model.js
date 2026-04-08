@@ -12,25 +12,31 @@ export const createSubCategoryModel = async ({ category_id, sub_category_name, s
   return result;
 };
 
-export const getSubCategoriesModel = async (search = "") => {
-  const hasSearch = Boolean(search);
-  const query = hasSearch
-    ? `
-      SELECT sc.*, c.category_name
-      FROM sub_categories sc
-      LEFT JOIN categories c ON sc.category_id = c.id
-      WHERE sc.status != 'inactive' AND sc.sub_category_name LIKE ?
-      ORDER BY sc.id DESC
-    `
-    : `
-      SELECT sc.*, c.category_name
-      FROM sub_categories sc
-      LEFT JOIN categories c ON sc.category_id = c.id
-      WHERE sc.status != 'inactive'
-      ORDER BY sc.id DESC
-    `;
+export const getSubCategoriesModel = async (search = "", status) => {
+  const conditions = [];
+  const params = [];
 
-  const params = hasSearch ? [`%${search}%`] : [];
+  if (search) {
+    conditions.push("sc.sub_category_name LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  if (status) {
+    conditions.push("sc.status = ?");
+    params.push(status);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+  const query = `
+    SELECT sc.*, c.category_name
+    FROM sub_categories sc
+    LEFT JOIN categories c ON sc.category_id = c.id
+    ${whereClause}
+    ORDER BY sc.id DESC
+  `;
+
   const [rows] = await db.execute(query, params);
   return rows;
 };

@@ -51,7 +51,12 @@ export const createSubCategory = async (req, res) => {
 export const getSubCategories = async (req, res) => {
   try {
     const search = req.query.search?.trim() ?? "";
-    const subCategories = await getSubCategoriesModel(search);
+    const requestedStatus = req.query.status?.trim().toLowerCase();
+    const status =
+      requestedStatus === "active" || requestedStatus === "inactive"
+        ? requestedStatus
+        : undefined;
+    const subCategories = await getSubCategoriesModel(search, status);
 
     return successResponse(res, "Sub categories fetched successfully", {
       records: subCategories.length,

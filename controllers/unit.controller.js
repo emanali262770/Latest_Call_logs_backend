@@ -45,7 +45,12 @@ export const createUnit = async (req, res) => {
 export const getUnits = async (req, res) => {
   try {
     const search = req.query.search?.trim() ?? "";
-    const units = await getUnitsModel(search);
+    const requestedStatus = req.query.status?.trim().toLowerCase();
+    const status =
+      requestedStatus === "active" || requestedStatus === "inactive"
+        ? requestedStatus
+        : undefined;
+    const units = await getUnitsModel(search, status);
 
     return successResponse(res, "Units fetched successfully", {
       records: units.length,

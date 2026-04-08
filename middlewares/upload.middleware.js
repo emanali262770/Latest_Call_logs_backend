@@ -116,3 +116,34 @@ export const uploadCompanyAssets = multer({
     fileSize: 5 * 1024 * 1024,
   },
 });
+
+const itemImageDirectory = path.join(uploadsRoot, "items");
+ensureDirectory(itemImageDirectory);
+
+const itemImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, itemImageDirectory);
+  },
+  filename: (req, file, cb) => {
+    cb(null, buildStoredFilename(file));
+  },
+});
+
+const itemImageFileFilter = (req, file, cb) => {
+  const allowedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+
+  if (!allowedImageTypes.includes(file.mimetype)) {
+    cb(new Error("image must be a JPG, JPEG, PNG, or WEBP image"));
+    return;
+  }
+
+  cb(null, true);
+};
+
+export const uploadItemImage = multer({
+  storage: itemImageStorage,
+  fileFilter: itemImageFileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+});

@@ -45,7 +45,12 @@ export const createLocation = async (req, res) => {
 export const getLocations = async (req, res) => {
   try {
     const search = req.query.search?.trim() ?? "";
-    const locations = await getLocationsModel(search);
+    const requestedStatus = req.query.status?.trim().toLowerCase();
+    const status =
+      requestedStatus === "active" || requestedStatus === "inactive"
+        ? requestedStatus
+        : undefined;
+    const locations = await getLocationsModel(search, status);
 
     return successResponse(res, "Locations fetched successfully", {
       records: locations.length,

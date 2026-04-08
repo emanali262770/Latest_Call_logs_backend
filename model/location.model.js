@@ -12,23 +12,30 @@ export const createLocationModel = async ({ location_name, address, status }) =>
   return result;
 };
 
-export const getLocationsModel = async (search = "") => {
-  const hasSearch = Boolean(search);
-  const query = hasSearch
-    ? `
-      SELECT *
-      FROM locations
-      WHERE status != 'inactive' AND location_name LIKE ?
-      ORDER BY id DESC
-    `
-    : `
-      SELECT *
-      FROM locations
-      WHERE status != 'inactive'
-      ORDER BY id DESC
-    `;
+export const getLocationsModel = async (search = "", status) => {
+  const conditions = [];
+  const params = [];
 
-  const params = hasSearch ? [`%${search}%`] : [];
+  if (search) {
+    conditions.push("location_name LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+  const query = `
+    SELECT *
+    FROM locations
+    ${whereClause}
+    ORDER BY id DESC
+  `;
+
   const [rows] = await db.execute(query, params);
   return rows;
 };

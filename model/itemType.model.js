@@ -12,23 +12,30 @@ export const createItemTypeModel = async ({ item_type_name, status }) => {
   return result;
 };
 
-export const getItemTypesModel = async (search = "") => {
-  const hasSearch = Boolean(search);
-  const query = hasSearch
-    ? `
-      SELECT *
-      FROM item_types
-      WHERE status != 'inactive' AND item_type_name LIKE ?
-      ORDER BY id DESC
-    `
-    : `
-      SELECT *
-      FROM item_types
-      WHERE status != 'inactive'
-      ORDER BY id DESC
-    `;
+export const getItemTypesModel = async (search = "", status) => {
+  const conditions = [];
+  const params = [];
 
-  const params = hasSearch ? [`%${search}%`] : [];
+  if (search) {
+    conditions.push("item_type_name LIKE ?");
+    params.push(`%${search}%`);
+  }
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+  const query = `
+    SELECT *
+    FROM item_types
+    ${whereClause}
+    ORDER BY id DESC
+  `;
+
   const [rows] = await db.execute(query, params);
   return rows;
 };

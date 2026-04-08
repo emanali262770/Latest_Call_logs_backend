@@ -2,6 +2,7 @@ import express from "express";
 import {
   createItemType,
   getItemTypes,
+  getActiveItemTypes,
   getItemTypeById,
   updateItemType,
   deleteItemType,
@@ -16,6 +17,13 @@ router.post(
   protect,
   checkPermission("INVENTORY.ITEM_TYPE.CREATE"),
   createItemType
+);
+
+router.get(
+  "/active",
+  protect,
+  checkPermission("INVENTORY.ITEM_TYPE.READ"),
+  getActiveItemTypes
 );
 
 router.get(
