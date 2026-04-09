@@ -1,5 +1,6 @@
 import {
   createGroupModel,
+  deleteGroupModel,
   getAvailableGroupPermissionsModel,
   getGroupByIdModel,
   getGroupPermissionsModel,
@@ -86,5 +87,26 @@ export const getAvailableGroupPermissions = async (req, res) => {
       500,
       error.message
     );
+  }
+};
+
+export const deleteGroup = async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const group = await getGroupByIdModel(groupId);
+
+    if (!group) {
+      return errorResponse(res, "Group not found", 404);
+    }
+
+    if (group.group_name?.trim().toLowerCase() === "admin") {
+      return errorResponse(res, "Admin group cannot be deleted", 400);
+    }
+
+    await deleteGroupModel(groupId);
+
+    return successResponse(res, "Group deleted successfully");
+  } catch (error) {
+    return errorResponse(res, "Failed to delete group", 500, error.message);
   }
 };

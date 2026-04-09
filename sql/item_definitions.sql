@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS item_definitions (
   item_name VARCHAR(255) NOT NULL,
   unit_id INT NOT NULL,
   unit_qty DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  stock DECIMAL(12, 2) NOT NULL DEFAULT 0,
   reorder_level INT NOT NULL DEFAULT 0,
   location_id INT DEFAULT NULL,
   purchase_price DECIMAL(12, 2) NOT NULL DEFAULT 0,

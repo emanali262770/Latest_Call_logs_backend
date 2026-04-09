@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createGroup,
+  deleteGroup,
   getAvailableGroupPermissions,
   getGroupPermissions,
   getGroups,
@@ -41,6 +42,13 @@ router.get(
   protect,
   checkPermission("ACCESS.GROUPS.READ"),
   getAvailableGroupPermissions
+);
+
+router.delete(
+  "/:id",
+  protect,
+  checkPermission("ACCESS.GROUPS.DELETE"),
+  deleteGroup
 );
 
 export default router;

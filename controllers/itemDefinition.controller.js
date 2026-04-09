@@ -99,10 +99,6 @@ const validateBarcodeSelection = (primaryBarcode, secondaryBarcode) => {
     return "Either primary_barcode or secondary_barcode is required";
   }
 
-  if (providedCount > 1) {
-    return "Only one barcode is allowed at a time. Send either primary_barcode or secondary_barcode";
-  }
-
   return null;
 };
 
@@ -193,10 +189,12 @@ export const createItemDefinition = async (req, res) => {
       return errorResponse(res, "Item code already exists", 409);
     }
 
-    const selectedBarcode = nextPrimaryBarcode || nextSecondaryBarcode;
-    const existingBarcode = await getItemDefinitionByBarcodeModel(selectedBarcode);
-    if (existingBarcode) {
-      return errorResponse(res, "Barcode already exists", 409);
+    const barcodesToCheck = [...new Set([nextPrimaryBarcode, nextSecondaryBarcode].filter(Boolean))];
+    for (const barcode of barcodesToCheck) {
+      const existingBarcode = await getItemDefinitionByBarcodeModel(barcode);
+      if (existingBarcode) {
+        return errorResponse(res, "Barcode already exists", 409);
+      }
     }
 
     const itemTypeIdValue = toNumberOrNull(item_type_id);
@@ -520,10 +518,12 @@ export const updateItemDefinition = async (req, res) => {
       }
     }
 
-    const selectedBarcode = nextPrimaryBarcode || nextSecondaryBarcode;
-    const existingBarcode = await getItemDefinitionByBarcodeModel(selectedBarcode);
-    if (existingBarcode && existingBarcode.id !== Number(itemDefinitionId)) {
-      return errorResponse(res, "Barcode already exists", 409);
+    const barcodesToCheck = [...new Set([nextPrimaryBarcode, nextSecondaryBarcode].filter(Boolean))];
+    for (const barcode of barcodesToCheck) {
+      const existingBarcode = await getItemDefinitionByBarcodeModel(barcode);
+      if (existingBarcode && existingBarcode.id !== Number(itemDefinitionId)) {
+        return errorResponse(res, "Barcode already exists", 409);
+      }
     }
 
     const itemTypeIdValue = hasOwn(req.body, "item_type_id")

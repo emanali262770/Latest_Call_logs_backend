@@ -1,0 +1,3 @@
+ALTER TABLE item_definitions
+ADD COLUMN stock DECIMAL(12, 2) NOT NULL DEFAULT 0
+AFTER unit_qty;

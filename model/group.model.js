@@ -31,6 +31,35 @@ export const getGroupByIdModel = async (id) => {
   return rows[0];
 };
 
+export const deleteGroupModel = async (groupId) => {
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    await connection.execute(`DELETE FROM group_permissions WHERE group_id = ?`, [
+      groupId,
+    ]);
+
+    await connection.execute(`DELETE FROM user_groups WHERE group_id = ?`, [
+      groupId,
+    ]);
+
+    const [result] = await connection.execute(
+      `DELETE FROM software_groups WHERE id = ?`,
+      [groupId]
+    );
+
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 export const getGroupPermissionsModel = async (groupId) => {
   const [rows] = await db.execute(
     `
