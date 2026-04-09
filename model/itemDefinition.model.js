@@ -28,6 +28,8 @@ const ensureLowStockNotificationReadsTableModel = async () => {
 const itemDefinitionSelectClause = `
   SELECT
     i.*,
+    CAST(i.stock AS UNSIGNED) AS stock,
+    CAST(i.unit_qty AS UNSIGNED) AS unit_qty,
     it.item_type_name,
     c.category_name,
     sc.sub_category_name,
@@ -258,7 +260,7 @@ export const getLowStockItemDefinitionsModel = async (userId) => {
       AND idnr.user_id = ?
       AND idnr.item_updated_at = i.updated_at
     WHERE i.status = 'active'
-      AND i.unit_qty < i.reorder_level
+      AND i.stock < i.reorder_level
       AND idnr.id IS NULL
     ORDER BY i.updated_at DESC, i.id DESC
     `,
@@ -280,7 +282,7 @@ export const getLowStockItemDefinitionsCountModel = async (userId) => {
       AND idnr.user_id = ?
       AND idnr.item_updated_at = i.updated_at
     WHERE i.status = 'active'
-      AND i.unit_qty < i.reorder_level
+      AND i.stock < i.reorder_level
       AND idnr.id IS NULL
     `,
     [userId]
@@ -298,7 +300,7 @@ export const markLowStockItemDefinitionAsReadModel = async (itemDefinitionId, us
     FROM item_definitions
     WHERE id = ?
       AND status = 'active'
-      AND unit_qty < reorder_level
+      AND stock < reorder_level
     LIMIT 1
     `,
     [itemDefinitionId]

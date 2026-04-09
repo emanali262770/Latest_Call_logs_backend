@@ -27,6 +27,8 @@ import unitRoutes from './routes/unit.routes.js';
 import locationRoutes from './routes/location.routes.js';
 import supplierRoutes from './routes/supplier.routes.js';
 import itemDefinitionRoutes from './routes/itemDefinition.routes.js';
+import openingStockRoutes from './routes/openingStock.routes.js';
+import itemReportRoutes from './routes/itemReport.routes.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -34,7 +36,7 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(cors({
-  origin: ["http://192.168.100.13:5173", "http://localhost:5173"],
+  origin: ["http://192.168.100.13:5173", "http://localhost:5173","http://192.168.0.104:5173"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
 }));
@@ -66,6 +68,8 @@ app.use('/api/units', unitRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/item-definitions', itemDefinitionRoutes);
+app.use('/api/opening-stock', openingStockRoutes);
+app.use('/api/item-report', itemReportRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Request error:", err);

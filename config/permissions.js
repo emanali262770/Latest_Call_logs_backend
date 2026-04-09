@@ -392,6 +392,27 @@ export const ALL_PERMISSIONS = [
     description: "Delete item definition",
   },
   {
+    module: "INVENTORY",
+    sub_module: "OPENING_STOCK",
+    action: "READ",
+    key_name: "INVENTORY.OPENING_STOCK.READ",
+    description: "Read opening stock",
+  },
+  {
+    module: "INVENTORY",
+    sub_module: "OPENING_STOCK",
+    action: "UPDATE",
+    key_name: "INVENTORY.OPENING_STOCK.UPDATE",
+    description: "Update opening stock",
+  },
+  {
+    module: "INVENTORY",
+    sub_module: "ITEM_REPORT",
+    action: "READ",
+    key_name: "INVENTORY.ITEM_REPORT.READ",
+    description: "Read item report",
+  },
+  {
     module: "ACCESS",
     sub_module: "USERS",
     action: "CREATE",
