@@ -3,6 +3,8 @@ import {
   createItemDefinition,
   getItemDefinitions,
   getItemDefinitionById,
+  printItemDefinitionById,
+  printBarcodeById,
   getItemDefinitionByBarcode,
   getLowStockItemDefinitions,
   getLowStockItemDefinitionsCount,
@@ -52,6 +54,20 @@ router.get(
   protect,
   checkPermission("INVENTORY.ITEM_DEFINITION.READ"),
   getItemDefinitions
+);
+
+router.get(
+  "/:id/print",
+  protect,
+  checkPermission("INVENTORY.ITEM_DEFINITION.PRINT"),
+  printItemDefinitionById
+);
+
+router.get(
+  "/:id/print-barcode",
+  protect,
+  checkPermission("INVENTORY.ITEM_DEFINITION.PRINT"),
+  printBarcodeById
 );
 
 router.get(

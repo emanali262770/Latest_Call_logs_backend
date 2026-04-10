@@ -70,3 +70,25 @@ export const getItemReportItemsModel = async ({
     boxes: row.unit_qty > 0 ? parseFloat((row.stock / row.unit_qty).toFixed(2)) : 0,
   }));
 };
+
+export const getItemReportItemByIdModel = async (id) => {
+  const [rows] = await db.execute(
+    `
+    ${itemReportSelectClause}
+    WHERE i.status = 'active' AND i.id = ?
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    ...row,
+    boxes: row.unit_qty > 0 ? parseFloat((row.stock / row.unit_qty).toFixed(2)) : 0,
+  };
+};

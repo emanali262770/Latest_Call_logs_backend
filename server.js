@@ -37,7 +37,7 @@ const __dirname = path.dirname(__filename);
 // Middleware
 app.use(cors({
   origin: ["http://192.168.100.13:5173", "http://localhost:5173","http://192.168.0.104:5173"],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
 }));
 app.use(express.json());

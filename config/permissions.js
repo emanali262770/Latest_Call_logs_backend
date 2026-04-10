@@ -393,6 +393,13 @@ export const ALL_PERMISSIONS = [
   },
   {
     module: "INVENTORY",
+    sub_module: "ITEM_DEFINITION",
+    action: "PRINT",
+    key_name: "INVENTORY.ITEM_DEFINITION.PRINT",
+    description: "Print item definition",
+  },
+  {
+    module: "INVENTORY",
     sub_module: "OPENING_STOCK",
     action: "READ",
     key_name: "INVENTORY.OPENING_STOCK.READ",
@@ -411,6 +418,13 @@ export const ALL_PERMISSIONS = [
     action: "READ",
     key_name: "INVENTORY.ITEM_REPORT.READ",
     description: "Read item report",
+  },
+  {
+    module: "INVENTORY",
+    sub_module: "ITEM_REPORT",
+    action: "PRINT",
+    key_name: "INVENTORY.ITEM_REPORT.PRINT",
+    description: "Print item report",
   },
   {
     module: "ACCESS",
@@ -495,5 +509,12 @@ export const ALL_PERMISSIONS = [
     action: "UPDATE",
     key_name: "SETUP.COMPANY.UPDATE",
     description: "Update company profile",
+  },
+  {
+    module: "SETUP",
+    sub_module: "COMPANY",
+    action: "PRINT",
+    key_name: "SETUP.COMPANY.PRINT",
+    description: "Print company profile",
   },
 ];

@@ -1,6 +1,7 @@
 import express from "express";
 import {
   getCompanyProfile,
+  printCompanyProfile,
   upsertCompanyProfile,
 } from "../controllers/company.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
@@ -13,6 +14,13 @@ router.get(
   "/",
   protect,
   getCompanyProfile
+);
+
+router.get(
+  "/print",
+  protect,
+  checkPermission("SETUP.COMPANY.PRINT"),
+  printCompanyProfile
 );
 
 router.put(

@@ -1,3 +1,4 @@
+import { getCompanySummaryModel } from "../model/company.model.js";
 import {
   createItemDefinitionModel,
   deleteItemDefinitionModel,
@@ -391,6 +392,42 @@ export const getItemDefinitionById = async (req, res) => {
   }
 };
 
+export const printBarcodeById = async (req, res) => {
+  try {
+    const itemDefinition = await getItemDefinitionByIdModel(req.params.id);
+
+    if (!itemDefinition) {
+      return errorResponse(res, "Item definition not found", 404);
+    }
+
+    const company = await getCompanySummaryModel();
+    const barcode = itemDefinition.secondary_barcode || itemDefinition.primary_barcode;
+
+    return successResponse(res, "Barcode data fetched successfully", {
+      company_name: company?.company_name || null,
+      item_name: itemDefinition.item_name,
+      sale_price: itemDefinition.sale_price,
+      barcode,
+    });
+  } catch (error) {
+    return errorResponse(res, "Failed to fetch barcode data", 500, error.message);
+  }
+};
+
+export const printItemDefinitionById = async (req, res) => {
+  try {
+    const itemDefinition = await getItemDefinitionByIdModel(req.params.id);
+
+    if (!itemDefinition) {
+      return errorResponse(res, "Item definition not found", 404);
+    }
+
+    return successResponse(res, "Item definition fetched successfully for print", itemDefinition);
+  } catch (error) {
+    return errorResponse(res, "Failed to fetch item definition for print", 500, error.message);
+  }
+};
+
 export const getItemDefinitionByBarcode = async (req, res) => {
   try {
     const { barcode } = req.params;
@@ -724,7 +761,7 @@ export const updateItemDefinition = async (req, res) => {
       is_cost_item: nextIsCostItem,
       stop_sale: nextStopSale,
       image: nextImage,
-      status: status ?? itemDefinition.status,
+      status: nextStopSale === 1 ? "inactive" : "active",
     });
 
     if (previousImage && previousImage !== nextImage) {

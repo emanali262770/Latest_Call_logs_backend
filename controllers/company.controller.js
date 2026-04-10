@@ -91,6 +91,16 @@ export const getCompanyProfile = async (req, res) => {
   }
 };
 
+export const printCompanyProfile = async (req, res) => {
+  try {
+    const company = await getCompanyProfileModel();
+
+    return successResponse(res, "Company profile fetched successfully for print", company);
+  } catch (error) {
+    return errorResponse(res, "Failed to fetch company profile for print", 500, error.message);
+  }
+};
+
 export const upsertCompanyProfile = async (req, res) => {
   try {
     const existingCompany = await getCompanyProfileModel();
