@@ -29,6 +29,7 @@ import supplierRoutes from './routes/supplier.routes.js';
 import itemDefinitionRoutes from './routes/itemDefinition.routes.js';
 import openingStockRoutes from './routes/openingStock.routes.js';
 import itemReportRoutes from './routes/itemReport.routes.js';
+import serviceRoutes from './routes/service.routes.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -70,6 +71,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/item-definitions', itemDefinitionRoutes);
 app.use('/api/opening-stock', openingStockRoutes);
 app.use('/api/item-report', itemReportRoutes);
+app.use('/api/services', serviceRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Request error:", err);
