@@ -1,22 +1,22 @@
 import { db } from "../config/db.js";
 
-export const generateSupplierCodeModel = async () => {
+export const generateCustomerCodeModel = async () => {
   const [rows] = await db.execute(
     `
     SELECT id
-    FROM suppliers
+    FROM customers
     ORDER BY id DESC
     LIMIT 1
     `
   );
 
-  const nextSupplierNumber = (rows[0]?.id || 0) + 1;
-  return `SUP-${String(nextSupplierNumber).padStart(4, "0")}`;
+  const nextCustomerNumber = (rows[0]?.id || 0) + 1;
+  return `CUS-${String(nextCustomerNumber).padStart(4, "0")}`;
 };
 
-export const createSupplierModel = async ({
-  supplier_code,
-  supplier_name,
+export const createCustomerModel = async ({
+  customer_code,
+  customer_name,
   phone,
   email,
   address,
@@ -26,9 +26,9 @@ export const createSupplierModel = async ({
 }) => {
   const [result] = await db.execute(
     `
-    INSERT INTO suppliers (
-      supplier_code,
-      supplier_name,
+    INSERT INTO customers (
+      customer_code,
+      customer_name,
       phone,
       email,
       address,
@@ -39,8 +39,8 @@ export const createSupplierModel = async ({
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
-      supplier_code,
-      supplier_name.trim(),
+      customer_code,
+      customer_name.trim(),
       phone,
       email,
       address,
@@ -53,13 +53,15 @@ export const createSupplierModel = async ({
   return result;
 };
 
-export const getSuppliersModel = async (search = "", status) => {
+export const getCustomersModel = async (search = "", status) => {
   const conditions = [];
   const params = [];
 
   if (search) {
-    conditions.push("supplier_name LIKE ?");
-    params.push(`%${search}%`);
+    conditions.push(
+      "(customer_name LIKE ? OR customer_code LIKE ? OR phone LIKE ? OR email LIKE ? OR address LIKE ?)"
+    );
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   if (status) {
@@ -70,71 +72,81 @@ export const getSuppliersModel = async (search = "", status) => {
   const whereClause = conditions.length
     ? `WHERE ${conditions.join(" AND ")}`
     : "";
-  const query = `
-    SELECT
-      id,
-      supplier_code,
-      supplier_name AS name,
-      supplier_name,
-      phone,
-      email,
-      address,
-      opening_balance,
-      ob_date,
-      status,
-      created_at,
-      updated_at
-    FROM suppliers
-    ${whereClause}
-    ORDER BY id DESC
-  `;
 
-  const [rows] = await db.execute(query, params);
-  return rows;
-};
-
-export const getSupplierByIdModel = async (id) => {
   const [rows] = await db.execute(
     `
     SELECT
       id,
-      supplier_code,
-      supplier_name AS name,
-      supplier_name,
+      customer_code AS code,
+      customer_code,
+      customer_name AS name,
+      customer_name,
       phone,
       email,
       address,
+      opening_balance AS openingBalance,
       opening_balance,
+      ob_date AS obDate,
       ob_date,
       status,
       created_at,
       updated_at
-    FROM suppliers
+    FROM customers
+    ${whereClause}
+    ORDER BY id DESC
+    `,
+    params
+  );
+
+  return rows;
+};
+
+export const getCustomerByIdModel = async (id) => {
+  const [rows] = await db.execute(
+    `
+    SELECT
+      id,
+      customer_code AS code,
+      customer_code,
+      customer_name AS name,
+      customer_name,
+      phone,
+      email,
+      address,
+      opening_balance AS openingBalance,
+      opening_balance,
+      ob_date AS obDate,
+      ob_date,
+      status,
+      created_at,
+      updated_at
+    FROM customers
     WHERE id = ?
     `,
     [id]
   );
+
   return rows[0];
 };
 
-export const getSupplierByNameModel = async (supplier_name) => {
+export const getCustomerByNameModel = async (customer_name) => {
   const [rows] = await db.execute(
     `
     SELECT *
-    FROM suppliers
-    WHERE LOWER(TRIM(supplier_name)) = LOWER(TRIM(?))
+    FROM customers
+    WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?))
     LIMIT 1
     `,
-    [supplier_name]
+    [customer_name]
   );
 
   return rows[0];
 };
 
-export const updateSupplierModel = async ({
+export const updateCustomerModel = async ({
   id,
-  supplier_code,
-  supplier_name,
+  customer_code,
+  customer_name,
   phone,
   email,
   address,
@@ -144,10 +156,10 @@ export const updateSupplierModel = async ({
 }) => {
   const [result] = await db.execute(
     `
-    UPDATE suppliers
+    UPDATE customers
     SET
-      supplier_code = ?,
-      supplier_name = ?,
+      customer_code = ?,
+      customer_name = ?,
       phone = ?,
       email = ?,
       address = ?,
@@ -157,8 +169,8 @@ export const updateSupplierModel = async ({
     WHERE id = ?
     `,
     [
-      supplier_code,
-      supplier_name,
+      customer_code,
+      customer_name,
       phone,
       email,
       address,
@@ -172,7 +184,7 @@ export const updateSupplierModel = async ({
   return result;
 };
 
-export const deleteSupplierModel = async (id) => {
-  const [result] = await db.execute(`DELETE FROM suppliers WHERE id = ?`, [id]);
+export const deleteCustomerModel = async (id) => {
+  const [result] = await db.execute(`DELETE FROM customers WHERE id = ?`, [id]);
   return result;
 };

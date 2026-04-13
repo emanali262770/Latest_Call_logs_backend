@@ -1,5 +1,6 @@
 import {
   createSupplierModel,
+  generateSupplierCodeModel,
   getSuppliersModel,
   getSupplierByIdModel,
   getSupplierByNameModel,
@@ -8,30 +9,66 @@ import {
 } from "../model/supplier.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
+const toNullable = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    return trimmedValue === "" ? null : trimmedValue;
+  }
+
+  return value;
+};
+
+const toOpeningBalance = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return 0;
+  }
+
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+};
+
 export const createSupplier = async (req, res) => {
   try {
-    const { name, phone, address, status } = req.body;
+    const supplierName = req.body.supplier_name ?? req.body.name;
+    const openingBalance = toOpeningBalance(req.body.opening_balance);
 
-    if (!name?.trim()) {
-      return errorResponse(res, "name is required", 400);
+    if (!supplierName?.trim()) {
+      return errorResponse(res, "supplier_name is required", 400);
     }
 
-    const existing = await getSupplierByNameModel(name);
+    if (openingBalance === null) {
+      return errorResponse(res, "opening_balance must be a valid number", 400);
+    }
+
+    const existing = await getSupplierByNameModel(supplierName);
     if (existing) {
       return errorResponse(res, "Supplier already exists", 409);
     }
 
+    const supplierCode =
+      toNullable(req.body.supplier_code) ?? (await generateSupplierCodeModel());
+
     const result = await createSupplierModel({
-      supplier_name: name,
-      phone,
-      address,
-      status,
+      supplier_code: supplierCode,
+      supplier_name: supplierName,
+      phone: toNullable(req.body.phone),
+      email: toNullable(req.body.email),
+      address: toNullable(req.body.address),
+      opening_balance: openingBalance,
+      ob_date: toNullable(req.body.ob_date),
+      status: req.body.status ?? "active",
     });
+
+    const createdSupplier = await getSupplierByIdModel(result.insertId);
 
     return successResponse(
       res,
       "Supplier created successfully",
-      { supplier_id: result.insertId },
+      createdSupplier,
       201
     );
   } catch (error) {
@@ -75,26 +112,38 @@ export const getSupplierById = async (req, res) => {
 export const updateSupplier = async (req, res) => {
   try {
     const supplierId = req.params.id;
-    const { name, phone, address, status } = req.body;
+    const supplierName = req.body.supplier_name ?? req.body.name;
 
     const supplier = await getSupplierByIdModel(supplierId);
     if (!supplier) {
       return errorResponse(res, "Supplier not found", 404);
     }
 
-    const nextName = name?.trim() || supplier.name;
+    const nextName = supplierName?.trim() || supplier.supplier_name;
 
     const duplicate = await getSupplierByNameModel(nextName);
     if (duplicate && duplicate.id !== Number(supplierId)) {
       return errorResponse(res, "Supplier already exists", 409);
     }
 
+    const nextOpeningBalance = Object.prototype.hasOwnProperty.call(req.body, "opening_balance")
+      ? toOpeningBalance(req.body.opening_balance)
+      : Number(supplier.opening_balance ?? 0);
+
+    if (nextOpeningBalance === null) {
+      return errorResponse(res, "opening_balance must be a valid number", 400);
+    }
+
     await updateSupplierModel({
       id: supplierId,
+      supplier_code: toNullable(req.body.supplier_code) ?? supplier.supplier_code,
       supplier_name: nextName,
-      phone: phone !== undefined ? (phone || null) : supplier.phone,
-      address: address !== undefined ? (address || null) : supplier.address,
-      status: status ?? supplier.status,
+      phone: req.body.phone !== undefined ? toNullable(req.body.phone) : supplier.phone,
+      email: req.body.email !== undefined ? toNullable(req.body.email) : supplier.email,
+      address: req.body.address !== undefined ? toNullable(req.body.address) : supplier.address,
+      opening_balance: nextOpeningBalance,
+      ob_date: req.body.ob_date !== undefined ? toNullable(req.body.ob_date) : supplier.ob_date,
+      status: req.body.status ?? supplier.status,
     });
 
     const updated = await getSupplierByIdModel(supplierId);

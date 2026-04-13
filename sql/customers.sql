@@ -1,8 +1,8 @@
-CREATE TABLE IF NOT EXISTS suppliers (
+CREATE TABLE IF NOT EXISTS customers (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  supplier_code VARCHAR(50) UNIQUE DEFAULT NULL,
-  supplier_name VARCHAR(255) NOT NULL,
-  phone VARCHAR(50) DEFAULT NULL,
+  customer_code VARCHAR(50) UNIQUE DEFAULT NULL,
+  customer_name VARCHAR(255) NOT NULL,
+  phone VARCHAR(50) NOT NULL,
   email VARCHAR(255) DEFAULT NULL,
   address TEXT DEFAULT NULL,
   opening_balance DECIMAL(12, 2) NOT NULL DEFAULT 0,
@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS suppliers (
   status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_supplier_name (supplier_name)
+  UNIQUE KEY unique_customer_name (customer_name)
 );

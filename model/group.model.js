@@ -76,7 +76,50 @@ export const getGroupPermissionsModel = async (groupId) => {
     FROM group_permissions gp
     INNER JOIN permissions p ON gp.permission_id = p.id
     WHERE gp.group_id = ?
-    ORDER BY p.module, p.sub_module, p.action, p.id
+    ORDER BY
+      CASE p.module
+        WHEN 'EMPLOYEE' THEN 1
+        WHEN 'INVENTORY' THEN 2
+        WHEN 'SERVICES' THEN 3
+        WHEN 'ACCESS' THEN 4
+        WHEN 'SETUP' THEN 5
+        ELSE 99
+      END,
+      CASE
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'EMPLOYEE' THEN 1
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'DEPARTMENT' THEN 2
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'DESIGNATION' THEN 3
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'EMPLOYEE_TYPE' THEN 4
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'DUTY_SHIFT' THEN 5
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'BANK' THEN 6
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'ITEM_TYPE' THEN 1
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'CATEGORY' THEN 2
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'SUB_CATEGORY' THEN 3
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'MANUFACTURER' THEN 4
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'UNIT' THEN 5
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'LOCATION' THEN 6
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'SUPPLIER' THEN 7
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'CUSTOMER' THEN 8
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'ITEM_DEFINITION' THEN 9
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'OPENING_STOCK' THEN 10
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'ITEM_REPORT' THEN 11
+        WHEN p.module = 'SERVICES' AND p.sub_module = 'SERVICE' THEN 1
+        WHEN p.module = 'ACCESS' AND p.sub_module = 'USERS' THEN 1
+        WHEN p.module = 'ACCESS' AND p.sub_module = 'GROUPS' THEN 2
+        WHEN p.module = 'ACCESS' AND p.sub_module = 'PERMISSIONS' THEN 3
+        WHEN p.module = 'SETUP' AND p.sub_module = 'COMPANY' THEN 1
+        ELSE 99
+      END,
+      CASE p.action
+        WHEN 'CREATE' THEN 1
+        WHEN 'READ' THEN 2
+        WHEN 'UPDATE' THEN 3
+        WHEN 'DELETE' THEN 4
+        WHEN 'PRINT' THEN 5
+        WHEN 'ASSIGN' THEN 6
+        ELSE 99
+      END,
+      p.id ASC
     `,
     [groupId]
   );
@@ -103,7 +146,50 @@ export const getAvailableGroupPermissionsModel = async (groupId) => {
       WHERE gp.group_id = ?
       AND gp.permission_id = p.id
     )
-    ORDER BY p.module, p.sub_module, p.action, p.id
+    ORDER BY
+      CASE p.module
+        WHEN 'EMPLOYEE' THEN 1
+        WHEN 'INVENTORY' THEN 2
+        WHEN 'SERVICES' THEN 3
+        WHEN 'ACCESS' THEN 4
+        WHEN 'SETUP' THEN 5
+        ELSE 99
+      END,
+      CASE
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'EMPLOYEE' THEN 1
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'DEPARTMENT' THEN 2
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'DESIGNATION' THEN 3
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'EMPLOYEE_TYPE' THEN 4
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'DUTY_SHIFT' THEN 5
+        WHEN p.module = 'EMPLOYEE' AND p.sub_module = 'BANK' THEN 6
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'ITEM_TYPE' THEN 1
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'CATEGORY' THEN 2
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'SUB_CATEGORY' THEN 3
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'MANUFACTURER' THEN 4
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'UNIT' THEN 5
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'LOCATION' THEN 6
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'SUPPLIER' THEN 7
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'CUSTOMER' THEN 8
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'ITEM_DEFINITION' THEN 9
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'OPENING_STOCK' THEN 10
+        WHEN p.module = 'INVENTORY' AND p.sub_module = 'ITEM_REPORT' THEN 11
+        WHEN p.module = 'SERVICES' AND p.sub_module = 'SERVICE' THEN 1
+        WHEN p.module = 'ACCESS' AND p.sub_module = 'USERS' THEN 1
+        WHEN p.module = 'ACCESS' AND p.sub_module = 'GROUPS' THEN 2
+        WHEN p.module = 'ACCESS' AND p.sub_module = 'PERMISSIONS' THEN 3
+        WHEN p.module = 'SETUP' AND p.sub_module = 'COMPANY' THEN 1
+        ELSE 99
+      END,
+      CASE p.action
+        WHEN 'CREATE' THEN 1
+        WHEN 'READ' THEN 2
+        WHEN 'UPDATE' THEN 3
+        WHEN 'DELETE' THEN 4
+        WHEN 'PRINT' THEN 5
+        WHEN 'ASSIGN' THEN 6
+        ELSE 99
+      END,
+      p.id ASC
     `,
     [groupId]
   );
