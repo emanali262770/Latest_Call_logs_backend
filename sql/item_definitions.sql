@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS item_definitions (
   stock DECIMAL(12, 2) NOT NULL DEFAULT 0,
   reorder_level INT NOT NULL DEFAULT 0,
   location_id INT DEFAULT NULL,
+  item_specification TEXT DEFAULT NULL,
   purchase_price DECIMAL(12, 2) NOT NULL DEFAULT 0,
   sale_price DECIMAL(12, 2) NOT NULL DEFAULT 0,
   is_expirable TINYINT(1) NOT NULL DEFAULT 0,

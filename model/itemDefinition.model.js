@@ -74,6 +74,7 @@ export const createItemDefinitionModel = async ({
   unit_qty,
   reorder_level,
   location_id,
+  item_specification,
   purchase_price,
   sale_price,
   is_expirable,
@@ -100,6 +101,7 @@ export const createItemDefinitionModel = async ({
       unit_qty,
       reorder_level,
       location_id,
+      item_specification,
       purchase_price,
       sale_price,
       is_expirable,
@@ -109,7 +111,7 @@ export const createItemDefinitionModel = async ({
       image,
       status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       item_code,
@@ -125,6 +127,7 @@ export const createItemDefinitionModel = async ({
       unit_qty,
       reorder_level,
       location_id,
+      item_specification,
       purchase_price,
       sale_price,
       is_expirable,
@@ -200,6 +203,19 @@ export const getItemDefinitionByItemCodeModel = async (itemCode) => {
   );
 
   return rows[0];
+};
+
+export const updateItemDefinitionSpecificationModel = async (id, itemSpecification) => {
+  const [result] = await db.execute(
+    `
+    UPDATE item_definitions
+    SET item_specification = ?
+    WHERE id = ?
+    `,
+    [itemSpecification, id]
+  );
+
+  return result;
 };
 
 export const getItemDefinitionByBarcodeModel = async (barcode) => {
@@ -340,6 +356,7 @@ export const updateItemDefinitionModel = async ({
   unit_qty,
   reorder_level,
   location_id,
+  item_specification,
   purchase_price,
   sale_price,
   is_expirable,
@@ -366,6 +383,7 @@ export const updateItemDefinitionModel = async ({
       unit_qty = ?,
       reorder_level = ?,
       location_id = ?,
+      item_specification = ?,
       purchase_price = ?,
       sale_price = ?,
       is_expirable = ?,
@@ -390,6 +408,7 @@ export const updateItemDefinitionModel = async ({
       unit_qty,
       reorder_level,
       location_id,
+      item_specification,
       purchase_price,
       sale_price,
       is_expirable,

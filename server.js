@@ -29,6 +29,7 @@ import supplierRoutes from './routes/supplier.routes.js';
 import customerRoutes from './routes/customer.routes.js';
 import itemDefinitionRoutes from './routes/itemDefinition.routes.js';
 import openingStockRoutes from './routes/openingStock.routes.js';
+import itemRateRoutes from './routes/itemRate.routes.js';
 import itemReportRoutes from './routes/itemReport.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 
@@ -72,6 +73,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/item-definitions', itemDefinitionRoutes);
 app.use('/api/opening-stock', openingStockRoutes);
+app.use('/api/item-rates', itemRateRoutes);
 app.use('/api/item-report', itemReportRoutes);
 app.use('/api/services', serviceRoutes);
 

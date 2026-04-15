@@ -1,0 +1,3 @@
+ALTER TABLE item_rates
+  ADD COLUMN IF NOT EXISTS i_tax_percent DECIMAL(5, 2) NOT NULL DEFAULT 0 AFTER sales_tax_amount,
+  ADD COLUMN IF NOT EXISTS i_tax_amount DECIMAL(12, 2) NOT NULL DEFAULT 0 AFTER i_tax_percent;

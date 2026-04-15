@@ -146,6 +146,7 @@ export const createItemDefinition = async (req, res) => {
       unit_qty,
       reorder_level,
       location_id,
+      item_specification,
       purchase_price,
       sale_price,
       is_expirable,
@@ -331,6 +332,7 @@ export const createItemDefinition = async (req, res) => {
       unit_qty: nextUnitQty,
       reorder_level: nextReorderLevel,
       location_id: locationIdValue,
+      item_specification: toNullable(item_specification),
       purchase_price: nextPurchasePrice,
       sale_price: nextSalePrice,
       is_expirable: nextIsExpirable,
@@ -523,6 +525,7 @@ export const updateItemDefinition = async (req, res) => {
       unit_qty,
       reorder_level,
       location_id,
+      item_specification,
       purchase_price,
       sale_price,
       is_expirable,
@@ -608,6 +611,9 @@ export const updateItemDefinition = async (req, res) => {
     const nextStopSale = hasOwn(req.body, "stop_sale")
       ? toBooleanFlag(stop_sale)
       : Number(itemDefinition.stop_sale);
+    const nextItemSpecification = hasOwn(req.body, "item_specification")
+      ? toNullable(item_specification)
+      : itemDefinition.item_specification;
 
     for (const value of [
       itemTypeIdValue,
@@ -754,6 +760,7 @@ export const updateItemDefinition = async (req, res) => {
       unit_qty: nextUnitQty,
       reorder_level: nextReorderLevel,
       location_id: locationIdValue,
+      item_specification: nextItemSpecification,
       purchase_price: nextPurchasePrice,
       sale_price: nextSalePrice,
       is_expirable: nextIsExpirable,

@@ -31,13 +31,39 @@ const toOpeningBalance = (value) => {
   return Number.isFinite(parsedValue) ? parsedValue : null;
 };
 
+const pickBodyValue = (body, keys) => {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(body, key)) {
+      return body[key];
+    }
+  }
+
+  return undefined;
+};
+
 export const createSupplier = async (req, res) => {
   try {
     const supplierName = req.body.supplier_name ?? req.body.name;
+    const contactPerson = pickBodyValue(req.body, ["contact_person", "contactPerson"]);
+    const city = pickBodyValue(req.body, ["city"]);
+    const mobileNumber = pickBodyValue(req.body, ["mobile_number", "mobileNumber", "mobile"]);
+    const phoneNumber = pickBodyValue(req.body, ["phone", "phone_number", "phoneNumber"]);
     const openingBalance = toOpeningBalance(req.body.opening_balance);
 
     if (!supplierName?.trim()) {
       return errorResponse(res, "supplier_name is required", 400);
+    }
+
+    if (!toNullable(contactPerson)) {
+      return errorResponse(res, "contact_person is required", 400);
+    }
+
+    if (!toNullable(city)) {
+      return errorResponse(res, "city is required", 400);
+    }
+
+    if (!toNullable(phoneNumber)) {
+      return errorResponse(res, "phone is required", 400);
     }
 
     if (openingBalance === null) {
@@ -55,7 +81,10 @@ export const createSupplier = async (req, res) => {
     const result = await createSupplierModel({
       supplier_code: supplierCode,
       supplier_name: supplierName,
-      phone: toNullable(req.body.phone),
+      contact_person: toNullable(contactPerson),
+      city: toNullable(city),
+      mobile_number: toNullable(mobileNumber),
+      phone: toNullable(phoneNumber),
       email: toNullable(req.body.email),
       address: toNullable(req.body.address),
       opening_balance: openingBalance,
@@ -113,6 +142,10 @@ export const updateSupplier = async (req, res) => {
   try {
     const supplierId = req.params.id;
     const supplierName = req.body.supplier_name ?? req.body.name;
+    const contactPerson = pickBodyValue(req.body, ["contact_person", "contactPerson"]);
+    const city = pickBodyValue(req.body, ["city"]);
+    const mobileNumber = pickBodyValue(req.body, ["mobile_number", "mobileNumber", "mobile"]);
+    const phoneNumber = pickBodyValue(req.body, ["phone", "phone_number", "phoneNumber"]);
 
     const supplier = await getSupplierByIdModel(supplierId);
     if (!supplier) {
@@ -120,10 +153,28 @@ export const updateSupplier = async (req, res) => {
     }
 
     const nextName = supplierName?.trim() || supplier.supplier_name;
+    const nextContactPerson =
+      contactPerson !== undefined
+        ? toNullable(contactPerson)
+        : supplier.contact_person;
+    const nextCity = city !== undefined ? toNullable(city) : supplier.city;
+    const nextPhone = phoneNumber !== undefined ? toNullable(phoneNumber) : supplier.phone;
 
     const duplicate = await getSupplierByNameModel(nextName);
     if (duplicate && duplicate.id !== Number(supplierId)) {
       return errorResponse(res, "Supplier already exists", 409);
+    }
+
+    if (!nextContactPerson) {
+      return errorResponse(res, "contact_person is required", 400);
+    }
+
+    if (!nextCity) {
+      return errorResponse(res, "city is required", 400);
+    }
+
+    if (!nextPhone) {
+      return errorResponse(res, "phone is required", 400);
     }
 
     const nextOpeningBalance = Object.prototype.hasOwnProperty.call(req.body, "opening_balance")
@@ -138,7 +189,13 @@ export const updateSupplier = async (req, res) => {
       id: supplierId,
       supplier_code: toNullable(req.body.supplier_code) ?? supplier.supplier_code,
       supplier_name: nextName,
-      phone: req.body.phone !== undefined ? toNullable(req.body.phone) : supplier.phone,
+      contact_person: nextContactPerson,
+      city: nextCity,
+      mobile_number:
+        mobileNumber !== undefined
+          ? toNullable(mobileNumber)
+          : supplier.mobile_number,
+      phone: nextPhone,
       email: req.body.email !== undefined ? toNullable(req.body.email) : supplier.email,
       address: req.body.address !== undefined ? toNullable(req.body.address) : supplier.address,
       opening_balance: nextOpeningBalance,

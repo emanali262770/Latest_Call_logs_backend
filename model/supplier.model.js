@@ -17,6 +17,9 @@ export const generateSupplierCodeModel = async () => {
 export const createSupplierModel = async ({
   supplier_code,
   supplier_name,
+  contact_person,
+  city,
+  mobile_number,
   phone,
   email,
   address,
@@ -29,6 +32,9 @@ export const createSupplierModel = async ({
     INSERT INTO suppliers (
       supplier_code,
       supplier_name,
+      contact_person,
+      city,
+      mobile_number,
       phone,
       email,
       address,
@@ -36,11 +42,14 @@ export const createSupplierModel = async ({
       ob_date,
       status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       supplier_code,
       supplier_name.trim(),
+      contact_person,
+      city,
+      mobile_number,
       phone,
       email,
       address,
@@ -58,8 +67,18 @@ export const getSuppliersModel = async (search = "", status) => {
   const params = [];
 
   if (search) {
-    conditions.push("supplier_name LIKE ?");
-    params.push(`%${search}%`);
+    conditions.push(
+      "(supplier_name LIKE ? OR supplier_code LIKE ? OR contact_person LIKE ? OR city LIKE ? OR phone LIKE ? OR mobile_number LIKE ?)"
+    );
+    const searchValue = `%${search}%`;
+    params.push(
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue
+    );
   }
 
   if (status) {
@@ -76,6 +95,9 @@ export const getSuppliersModel = async (search = "", status) => {
       supplier_code,
       supplier_name AS name,
       supplier_name,
+      contact_person,
+      city,
+      mobile_number,
       phone,
       email,
       address,
@@ -101,6 +123,9 @@ export const getSupplierByIdModel = async (id) => {
       supplier_code,
       supplier_name AS name,
       supplier_name,
+      contact_person,
+      city,
+      mobile_number,
       phone,
       email,
       address,
@@ -135,6 +160,9 @@ export const updateSupplierModel = async ({
   id,
   supplier_code,
   supplier_name,
+  contact_person,
+  city,
+  mobile_number,
   phone,
   email,
   address,
@@ -148,6 +176,9 @@ export const updateSupplierModel = async ({
     SET
       supplier_code = ?,
       supplier_name = ?,
+      contact_person = ?,
+      city = ?,
+      mobile_number = ?,
       phone = ?,
       email = ?,
       address = ?,
@@ -159,6 +190,9 @@ export const updateSupplierModel = async ({
     [
       supplier_code,
       supplier_name,
+      contact_person,
+      city,
+      mobile_number,
       phone,
       email,
       address,
