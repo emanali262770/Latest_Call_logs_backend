@@ -22,6 +22,16 @@ import { successResponse, errorResponse } from "../utils/apiResponse.js";
 const hasOwn = (object, key) =>
   Object.prototype.hasOwnProperty.call(object || {}, key);
 
+const pickExistingValue = (record, keys, fallback = null) => {
+  for (const key of keys) {
+    if (record?.[key] !== undefined) {
+      return record[key];
+    }
+  }
+
+  return fallback;
+};
+
 const firstBodyValue = (body, keys, fallback) => {
   for (const key of keys) {
     if (hasOwn(body, key)) {
@@ -92,13 +102,32 @@ const calculatePricing = ({
   profit_percent,
   profit_amount,
 }) => {
-  const nextCurrency = String(currency || "PKR").trim().toUpperCase() === "USD" ? "USD" : "PKR";
+  const requestedCurrency =
+    String(currency || "PKR").trim().toUpperCase() === "USD" ? "USD" : "PKR";
   const nextExchangeRate = toNumber(exchange_rate, 1);
   const nextResellerPriceUsd = toNumber(reseller_price_usd, 0);
   const providedResellerPrice = toNumber(reseller_price, 0);
-  const nextResellerPrice =
-    nextCurrency === "USD" && nextResellerPriceUsd > 0
+  const calculatedResellerPriceFromUsd =
+    nextResellerPriceUsd > 0 && nextExchangeRate > 0
       ? roundMoney(nextResellerPriceUsd * nextExchangeRate)
+      : 0;
+
+  // When frontend sends both prices, preserve the PKR amount if it does not
+  // match the USD conversion after rounding. This prevents edit mode drift
+  // such as 60000 turning into 59999.xx on reopen.
+  const nextCurrency =
+    requestedCurrency === "USD" &&
+    nextResellerPriceUsd > 0 &&
+    providedResellerPrice > 0 &&
+    calculatedResellerPriceFromUsd !== roundMoney(providedResellerPrice)
+      ? "PKR"
+      : requestedCurrency;
+
+  const nextResellerPrice =
+    providedResellerPrice > 0
+      ? roundMoney(providedResellerPrice)
+      : nextCurrency === "USD" && nextResellerPriceUsd > 0
+      ? calculatedResellerPriceFromUsd
       : roundMoney(providedResellerPrice);
 
   const nextITaxPercent = toNumber(i_tax_percent, 0);
@@ -142,7 +171,10 @@ const calculatePricing = ({
   return {
     currency: nextCurrency,
     exchange_rate: nextExchangeRate,
-    reseller_price_usd: roundMoney(nextResellerPriceUsd),
+    reseller_price_usd:
+      nextCurrency === "USD" && nextResellerPriceUsd > 0
+        ? roundMoney(nextResellerPriceUsd)
+        : 0,
     reseller_price: nextResellerPrice,
     sale_price: nextSalePrice,
     sales_tax_percent: nextSalesTaxPercent,
@@ -191,22 +223,22 @@ const ensureActiveRecord = async (label, id, getter, required = false) => {
 const buildItemRatePayload = async (body, existing = null) => {
   const rateDate = hasOwn(body, "rate_date")
     ? toNullable(body.rate_date)
-    : normalizeDateValue(existing?.rate_date);
+    : normalizeDateValue(pickExistingValue(existing, ["rate_date", "rateDate"]));
   const supplierId = hasOwn(body, "supplier_id")
     ? toNumberOrNull(body.supplier_id)
-    : existing?.supplier_id;
+    : pickExistingValue(existing, ["supplier_id", "supplierId"]);
   const categoryId = hasOwn(body, "category_id")
     ? toNumberOrNull(body.category_id)
-    : existing?.category_id;
+    : pickExistingValue(existing, ["category_id", "categoryId"]);
   const subCategoryId = hasOwn(body, "sub_category_id")
     ? toNumberOrNull(body.sub_category_id)
-    : existing?.sub_category_id;
+    : pickExistingValue(existing, ["sub_category_id", "subCategoryId"]);
   const manufacturerId = hasOwn(body, "manufacturer_id")
     ? toNumberOrNull(body.manufacturer_id)
-    : existing?.manufacturer_id;
+    : pickExistingValue(existing, ["manufacturer_id", "manufacturerId"]);
   const itemDefinitionId = hasOwn(body, "item_definition_id")
     ? toNumberOrNull(body.item_definition_id)
-    : existing?.item_definition_id;
+    : pickExistingValue(existing, ["item_definition_id", "itemDefinitionId"]);
 
   if (!rateDate) {
     return { error: "rate_date is required" };
@@ -262,49 +294,53 @@ const buildItemRatePayload = async (body, existing = null) => {
 
   const pricing = calculatePricing({
     currency: hasOwn(body, "currency") ? body.currency : existing?.currency,
-    exchange_rate: hasOwn(body, "exchange_rate") ? body.exchange_rate : existing?.exchange_rate,
+    exchange_rate: hasOwn(body, "exchange_rate")
+      ? body.exchange_rate
+      : pickExistingValue(existing, ["exchange_rate", "exchangeRate"]),
     reseller_price_usd: hasOwn(body, "reseller_price_usd")
       ? body.reseller_price_usd
-      : existing?.reseller_price_usd,
+      : pickExistingValue(existing, ["reseller_price_usd", "resellerPriceUsd"]),
     reseller_price: hasOwn(body, "reseller_price")
       ? body.reseller_price
-      : existing?.reseller_price,
-    sale_price: hasOwn(body, "sale_price") ? body.sale_price : existing?.sale_price,
+      : pickExistingValue(existing, ["reseller_price", "resellerPrice"]),
+    sale_price: hasOwn(body, "sale_price")
+      ? body.sale_price
+      : pickExistingValue(existing, ["sale_price", "salePrice"]),
     sales_tax_percent: hasOwn(body, "sales_tax_percent")
       ? body.sales_tax_percent
-      : existing?.sales_tax_percent,
+      : pickExistingValue(existing, ["sales_tax_percent", "salesTaxPercent"]),
     sales_tax_amount: hasOwn(body, "sales_tax_amount")
       ? body.sales_tax_amount
-      : existing?.sales_tax_amount,
+      : pickExistingValue(existing, ["sales_tax_amount", "salesTaxAmount"]),
     i_tax_percent: firstBodyValue(
       body,
       ["i_tax_percent", "iTaxPercent", "iTaxPercentage"],
-      existing?.i_tax_percent
+      pickExistingValue(existing, ["i_tax_percent", "iTaxPercent"])
     ),
     i_tax_amount: firstBodyValue(
       body,
       ["i_tax_amount", "iTaxAmount"],
-      existing?.i_tax_amount
+      pickExistingValue(existing, ["i_tax_amount", "iTaxAmount"])
     ),
     other_tax_percent: firstBodyValue(
       body,
       ["other_tax_percent", "otherTaxPercent", "othersPercentage"],
-      existing?.other_tax_percent
+      pickExistingValue(existing, ["other_tax_percent", "otherTaxPercent"])
     ),
     other_tax_amount: firstBodyValue(
       body,
       ["other_tax_amount", "otherTaxAmount", "othersAmount"],
-      existing?.other_tax_amount
+      pickExistingValue(existing, ["other_tax_amount", "otherTaxAmount"])
     ),
     profit_percent: firstBodyValue(
       body,
       ["profit_percent", "profitTaxPercent", "profitPercentage"],
-      existing?.profit_percent
+      pickExistingValue(existing, ["profit_percent", "profitPercent"])
     ),
     profit_amount: firstBodyValue(
       body,
       ["profit_amount", "profitAmount"],
-      existing?.profit_amount
+      pickExistingValue(existing, ["profit_amount", "profitAmount"])
     ),
   });
 
@@ -323,14 +359,16 @@ const buildItemRatePayload = async (body, existing = null) => {
       supplier_id: Number(supplierId),
       quotation_id: hasOwn(body, "quotation_id")
         ? toNullable(body.quotation_id)
-        : toNullable(existing?.quotation_id),
+        : toNullable(pickExistingValue(existing, ["quotation_id", "quotationId"])),
       category_id: Number(categoryId),
       sub_category_id: subCategoryId,
       manufacturer_id: manufacturerId,
       item_definition_id: Number(itemDefinitionId),
       item_specification: hasOwn(body, "item_specification")
         ? toNullable(body.item_specification)
-        : toNullable(existing?.item_specification ?? item.item_specification),
+        : toNullable(
+            pickExistingValue(existing, ["item_specification", "itemSpecification"], item.item_specification)
+          ),
       ...pricing,
       status: body.status || existing?.status || "active",
     },
@@ -346,11 +384,7 @@ export const createItemRate = async (req, res) => {
 
     const duplicateItemRate = await getDuplicateItemRateModel(built.payload);
     if (duplicateItemRate) {
-      return errorResponse(
-        res,
-        "Item rate already exists for this item, supplier, quotation, and date",
-        409
-      );
+      return errorResponse(res, "Item rate already exists for this item", 409);
     }
 
     const result = await createItemRateModel(built.payload);
@@ -412,11 +446,7 @@ export const updateItemRate = async (req, res) => {
 
     const duplicateItemRate = await getDuplicateItemRateModel(built.payload);
     if (duplicateItemRate && Number(duplicateItemRate.id) !== Number(req.params.id)) {
-      return errorResponse(
-        res,
-        "Item rate already exists for this item, supplier, quotation, and date",
-        409
-      );
+      return errorResponse(res, "Item rate already exists for this item", 409);
     }
 
     await updateItemRateModel({ id: req.params.id, ...built.payload });

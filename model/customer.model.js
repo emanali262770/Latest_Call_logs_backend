@@ -1,51 +1,91 @@
 import { db } from "../config/db.js";
 
-export const generateCustomerCodeModel = async () => {
-  const [rows] = await db.execute(
-    `
-    SELECT id
-    FROM customers
-    ORDER BY id DESC
-    LIMIT 1
-    `
-  );
-
-  const nextCustomerNumber = (rows[0]?.id || 0) + 1;
-  return `CUS-${String(nextCustomerNumber).padStart(4, "0")}`;
-};
+const customerSelectClause = `
+  SELECT
+    c.id,
+    c.customer_group_id AS customerGroupId,
+    c.customer_group_id,
+    cg.group_name AS customerGroup,
+    cg.group_name AS groupName,
+    c.company,
+    c.person,
+    c.designation,
+    c.department,
+    c.office_address AS officeAddress,
+    c.office_address,
+    c.office_phone AS officePhone,
+    c.office_phone,
+    c.fax,
+    c.residence_address AS residenceAddress,
+    c.residence_address,
+    c.residence_phone AS residencePhone,
+    c.residence_phone,
+    c.mobile,
+    c.email,
+    c.website,
+    c.description,
+    c.status,
+    c.created_at AS createdAt,
+    c.created_at,
+    c.updated_at AS updatedAt,
+    c.updated_at
+  FROM customers c
+  LEFT JOIN customer_groups cg ON c.customer_group_id = cg.id
+`;
 
 export const createCustomerModel = async ({
-  customer_code,
-  customer_name,
-  phone,
+  customer_group_id,
+  company,
+  person,
+  designation,
+  department,
+  office_address,
+  office_phone,
+  fax,
+  residence_address,
+  residence_phone,
+  mobile,
   email,
-  address,
-  opening_balance,
-  ob_date,
+  website,
+  description,
   status,
 }) => {
   const [result] = await db.execute(
     `
     INSERT INTO customers (
-      customer_code,
-      customer_name,
-      phone,
+      customer_group_id,
+      company,
+      person,
+      designation,
+      department,
+      office_address,
+      office_phone,
+      fax,
+      residence_address,
+      residence_phone,
+      mobile,
       email,
-      address,
-      opening_balance,
-      ob_date,
+      website,
+      description,
       status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
-      customer_code,
-      customer_name.trim(),
-      phone,
+      customer_group_id,
+      company,
+      person.trim(),
+      designation,
+      department,
+      office_address,
+      office_phone,
+      fax,
+      residence_address,
+      residence_phone,
+      mobile.trim(),
       email,
-      address,
-      opening_balance,
-      ob_date,
+      website,
+      description,
       status || "active",
     ]
   );
@@ -59,13 +99,36 @@ export const getCustomersModel = async (search = "", status) => {
 
   if (search) {
     conditions.push(
-      "(customer_name LIKE ? OR customer_code LIKE ? OR phone LIKE ? OR email LIKE ? OR address LIKE ?)"
+      `(
+        COALESCE(cg.group_name, '') LIKE ?
+        OR COALESCE(c.company, '') LIKE ?
+        OR c.person LIKE ?
+        OR COALESCE(c.designation, '') LIKE ?
+        OR COALESCE(c.department, '') LIKE ?
+        OR COALESCE(c.office_phone, '') LIKE ?
+        OR COALESCE(c.residence_phone, '') LIKE ?
+        OR c.mobile LIKE ?
+        OR COALESCE(c.email, '') LIKE ?
+        OR COALESCE(c.website, '') LIKE ?
+      )`
     );
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    const searchValue = `%${search}%`;
+    params.push(
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue,
+      searchValue
+    );
   }
 
   if (status) {
-    conditions.push("status = ?");
+    conditions.push("c.status = ?");
     params.push(status);
   }
 
@@ -75,25 +138,9 @@ export const getCustomersModel = async (search = "", status) => {
 
   const [rows] = await db.execute(
     `
-    SELECT
-      id,
-      customer_code AS code,
-      customer_code,
-      customer_name AS name,
-      customer_name,
-      phone,
-      email,
-      address,
-      opening_balance AS openingBalance,
-      opening_balance,
-      ob_date AS obDate,
-      ob_date,
-      status,
-      created_at,
-      updated_at
-    FROM customers
+    ${customerSelectClause}
     ${whereClause}
-    ORDER BY id DESC
+    ORDER BY c.id DESC
     `,
     params
   );
@@ -104,24 +151,8 @@ export const getCustomersModel = async (search = "", status) => {
 export const getCustomerByIdModel = async (id) => {
   const [rows] = await db.execute(
     `
-    SELECT
-      id,
-      customer_code AS code,
-      customer_code,
-      customer_name AS name,
-      customer_name,
-      phone,
-      email,
-      address,
-      opening_balance AS openingBalance,
-      opening_balance,
-      ob_date AS obDate,
-      ob_date,
-      status,
-      created_at,
-      updated_at
-    FROM customers
-    WHERE id = ?
+    ${customerSelectClause}
+    WHERE c.id = ?
     `,
     [id]
   );
@@ -129,15 +160,30 @@ export const getCustomerByIdModel = async (id) => {
   return rows[0];
 };
 
-export const getCustomerByNameModel = async (customer_name) => {
+export const getCustomerByPersonAndMobileModel = async (person, mobile) => {
   const [rows] = await db.execute(
     `
-    SELECT *
+    SELECT id, person, mobile, status
     FROM customers
-    WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM(?))
+    WHERE LOWER(TRIM(person)) = LOWER(TRIM(?))
+      AND LOWER(TRIM(mobile)) = LOWER(TRIM(?))
     LIMIT 1
     `,
-    [customer_name]
+    [person, mobile]
+  );
+
+  return rows[0];
+};
+
+export const getCustomerByCompanyModel = async (company) => {
+  const [rows] = await db.execute(
+    `
+    SELECT id, company, status
+    FROM customers
+    WHERE LOWER(TRIM(company)) = LOWER(TRIM(?))
+    LIMIT 1
+    `,
+    [company]
   );
 
   return rows[0];
@@ -145,37 +191,58 @@ export const getCustomerByNameModel = async (customer_name) => {
 
 export const updateCustomerModel = async ({
   id,
-  customer_code,
-  customer_name,
-  phone,
+  customer_group_id,
+  company,
+  person,
+  designation,
+  department,
+  office_address,
+  office_phone,
+  fax,
+  residence_address,
+  residence_phone,
+  mobile,
   email,
-  address,
-  opening_balance,
-  ob_date,
+  website,
+  description,
   status,
 }) => {
   const [result] = await db.execute(
     `
     UPDATE customers
     SET
-      customer_code = ?,
-      customer_name = ?,
-      phone = ?,
+      customer_group_id = ?,
+      company = ?,
+      person = ?,
+      designation = ?,
+      department = ?,
+      office_address = ?,
+      office_phone = ?,
+      fax = ?,
+      residence_address = ?,
+      residence_phone = ?,
+      mobile = ?,
       email = ?,
-      address = ?,
-      opening_balance = ?,
-      ob_date = ?,
+      website = ?,
+      description = ?,
       status = ?
     WHERE id = ?
     `,
     [
-      customer_code,
-      customer_name,
-      phone,
+      customer_group_id,
+      company,
+      person.trim(),
+      designation,
+      department,
+      office_address,
+      office_phone,
+      fax,
+      residence_address,
+      residence_phone,
+      mobile.trim(),
       email,
-      address,
-      opening_balance,
-      ob_date,
+      website,
+      description,
       status,
       id,
     ]

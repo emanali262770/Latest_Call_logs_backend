@@ -4,18 +4,18 @@ const nullIfUndefined = (value) => (value === undefined ? null : value);
 
 const itemRateSelectClause = `
   SELECT
-    ir.*,
+    ir.id,
     ir.rate_date AS rateDate,
-    ir.quotation_id AS quotationId,
     ir.supplier_id AS supplierId,
+    ir.quotation_id AS quotationId,
     ir.category_id AS categoryId,
     ir.sub_category_id AS subCategoryId,
     ir.manufacturer_id AS manufacturerId,
     ir.item_definition_id AS itemDefinitionId,
     ir.item_specification AS itemSpecification,
-    ir.item_specification AS specification,
-    ir.reseller_price_usd AS resellerPriceUsd,
+    ir.currency,
     ir.exchange_rate AS exchangeRate,
+    ir.reseller_price_usd AS resellerPriceUsd,
     ir.reseller_price AS resellerPrice,
     ir.sale_price AS salePrice,
     ir.sales_tax_percent AS salesTaxPercent,
@@ -27,24 +27,18 @@ const itemRateSelectClause = `
     ir.profit_percent AS profitPercent,
     ir.profit_amount AS profitAmount,
     ir.sale_price_with_tax AS salePriceWithTax,
-    s.supplier_code,
-    s.supplier_name,
-    s.supplier_name AS supplierName,
+    ir.status,
+    ir.created_at AS createdAt,
+    ir.updated_at AS updatedAt,
+    s.supplier_code AS supplierCode,
     s.supplier_name AS supplier,
-    c.category_name,
-    c.category_name AS categoryName,
     c.category_name AS category,
-    sc.sub_category_name,
-    sc.sub_category_name AS subCategoryName,
     sc.sub_category_name AS subCategory,
-    m.manufacturer_name,
-    m.manufacturer_name AS manufacturerName,
     m.manufacturer_name AS manufacturer,
-    i.item_code,
     i.item_code AS itemCode,
-    i.item_name,
-    i.item_name AS itemName,
-    i.item_name AS item
+    i.item_name AS item,
+    i.unit_qty AS qty,
+    i.purchase_price AS purchasePrice
   FROM item_rates ir
   INNER JOIN suppliers s ON ir.supplier_id = s.id
   INNER JOIN categories c ON ir.category_id = c.id
@@ -186,24 +180,15 @@ export const getItemRateByIdModel = async (id) => {
 
 export const getDuplicateItemRateModel = async ({
   item_definition_id,
-  supplier_id,
-  quotation_id,
-  rate_date,
 }) => {
   const [rows] = await db.execute(
     `
     SELECT id, item_definition_id, supplier_id, quotation_id, rate_date
     FROM item_rates
     WHERE item_definition_id = ?
-      AND supplier_id = ?
-      AND rate_date = ?
-      AND (
-        (? IS NULL AND quotation_id IS NULL)
-        OR quotation_id = ?
-      )
     LIMIT 1
     `,
-    [item_definition_id, supplier_id, rate_date, quotation_id, quotation_id]
+    [item_definition_id]
   );
 
   return rows[0];
@@ -372,6 +357,8 @@ export const getActiveItemRateItemDetailsModel = async (itemId) => {
       i.id,
       i.item_code,
       i.item_name,
+      i.unit_qty AS qty,
+      i.purchase_price AS purchasePrice,
       i.category_id,
       c.category_name,
       c.category_name AS categoryName,
