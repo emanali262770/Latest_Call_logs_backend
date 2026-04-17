@@ -6,7 +6,8 @@ import {
   getActiveItemRateItemDetailsModel,
   getItemRateByIdModel,
   getItemRatesModel,
-  getLatestQuotationIdBySupplierModel,
+  getDistinctQuotationIdsBySupplierModel,
+  getLatestQuotationIdBySupplierAndItemModel,
   updateItemRateModel,
 } from "../model/itemRate.model.js";
 import { getCategoryByIdModel } from "../model/category.model.js";
@@ -492,11 +493,35 @@ export const getSupplierQuotationId = async (req, res) => {
       return errorResponse(res, "Supplier not found", 404);
     }
 
-    const quotation_id = await getLatestQuotationIdBySupplierModel(req.params.supplierId);
+    const itemDefinitionId = toNumberOrNull(req.query.item_definition_id);
+    if (Number.isNaN(itemDefinitionId)) {
+      return errorResponse(res, "item_definition_id is invalid", 400);
+    }
+
+    let quotation_id = null;
+    let isAmbiguous = false;
+
+    if (itemDefinitionId !== null) {
+      quotation_id = await getLatestQuotationIdBySupplierAndItemModel(
+        req.params.supplierId,
+        itemDefinitionId
+      );
+    } else {
+      const quotationIds = await getDistinctQuotationIdsBySupplierModel(req.params.supplierId);
+
+      if (quotationIds.length === 1) {
+        quotation_id = quotationIds[0];
+      } else {
+        isAmbiguous = quotationIds.length > 1;
+      }
+    }
+
     return successResponse(res, "Supplier quotation id fetched successfully", {
       supplier_id: Number(req.params.supplierId),
+      item_definition_id: itemDefinitionId,
       quotation_id,
       quotationId: quotation_id,
+      is_ambiguous: isAmbiguous,
     });
   } catch (error) {
     return errorResponse(res, "Failed to fetch supplier quotation id", 500, error.message);

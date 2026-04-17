@@ -211,6 +211,43 @@ export const getLatestQuotationIdBySupplierModel = async (supplierId) => {
   return rows[0]?.quotation_id || null;
 };
 
+export const getLatestQuotationIdBySupplierAndItemModel = async (
+  supplierId,
+  itemDefinitionId
+) => {
+  const [rows] = await db.execute(
+    `
+    SELECT quotation_id
+    FROM item_rates
+    WHERE supplier_id = ?
+      AND item_definition_id = ?
+      AND quotation_id IS NOT NULL
+      AND quotation_id <> ''
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [supplierId, itemDefinitionId]
+  );
+
+  return rows[0]?.quotation_id || null;
+};
+
+export const getDistinctQuotationIdsBySupplierModel = async (supplierId) => {
+  const [rows] = await db.execute(
+    `
+    SELECT DISTINCT quotation_id
+    FROM item_rates
+    WHERE supplier_id = ?
+      AND quotation_id IS NOT NULL
+      AND quotation_id <> ''
+    ORDER BY quotation_id ASC
+    `,
+    [supplierId]
+  );
+
+  return rows.map((row) => row.quotation_id);
+};
+
 export const updateItemRateModel = async ({
   id,
   rate_date,

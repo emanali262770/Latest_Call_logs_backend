@@ -1,6 +1,7 @@
 import {
   createEstimationModel,
   deleteEstimationModel,
+  getDuplicateEstimationByItemRateModel,
   getEstimationByIdModel,
   getEstimationsModel,
   getNextEstimateIdModel,
@@ -32,6 +33,29 @@ const toNullable = (value) => {
 const roundMoney = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+const buildEstimationsSummary = (estimations) => {
+  const totalPurchases = roundMoney(
+    estimations.reduce((sum, e) => sum + toNumber(e.purchaseTotal, 0), 0)
+  );
+  const totalDiscount = roundMoney(
+    estimations.reduce(
+      (sum, e) => sum + roundMoney(toNumber(e.saleTotalWithTax, 0) - toNumber(e.finalTotal, 0)),
+      0
+    )
+  );
+  const totalFinal = roundMoney(
+    estimations.reduce((sum, e) => sum + toNumber(e.finalTotal, 0), 0)
+  );
+  const profit = roundMoney(totalFinal - totalPurchases);
+
+  return {
+    totalPurchases,
+    totalDiscount,
+    totalFinal,
+    profit,
+  };
+};
+
 /**
  * Recalculate all derived fields from base inputs.
  * purchase_price  = reseller_price (PKR) from item_rate
@@ -49,8 +73,9 @@ const calcFields = ({ qty, purchase_price, sale_price, sale_price_with_tax, disc
   const sale_total          = roundMoney(sp * q);
   const sale_total_with_tax = roundMoney(spwt * q);
 
-  const discount_amount = roundMoney((spwt * disc) / 100);
-  const final_price     = roundMoney(spwt - discount_amount);
+  const perUnitDiscount = roundMoney((spwt * disc) / 100);
+  const discount_amount = roundMoney(perUnitDiscount * q);
+  const final_price     = roundMoney(spwt - perUnitDiscount);
   const final_total     = roundMoney(final_price * q);
 
   return {
@@ -95,6 +120,11 @@ export const createEstimation = async (req, res) => {
     const itemRate = await getItemRateByIdModel(item_rate_id);
     if (!itemRate) {
       return errorResponse(res, "Item rate not found", 404);
+    }
+
+    const duplicateEstimation = await getDuplicateEstimationByItemRateModel(item_rate_id);
+    if (duplicateEstimation) {
+      return errorResponse(res, "Estimation already exists for this item", 409);
     }
 
     // Validate customer if provided
@@ -181,25 +211,11 @@ export const getEstimations = async (req, res) => {
       customer_id: customer_id || null,
     });
 
-    const totalPurchases = roundMoney(
-      estimations.reduce((sum, e) => sum + toNumber(e.purchaseTotal, 0), 0)
-    );
-    const totalDiscount = roundMoney(
-      estimations.reduce((sum, e) => sum + toNumber(e.discountAmount, 0), 0)
-    );
-    const totalFinal = roundMoney(
-      estimations.reduce((sum, e) => sum + toNumber(e.finalTotal, 0), 0)
-    );
-    const profit = roundMoney(totalFinal - totalPurchases);
+    const summary = buildEstimationsSummary(estimations);
 
     return successResponse(res, "Estimations fetched successfully", {
       estimations,
-      summary: {
-        totalPurchases,
-        totalDiscount,
-        totalFinal,
-        profit,
-      },
+      summary,
     });
   } catch (error) {
     console.error("getEstimations error:", error);
@@ -258,6 +274,11 @@ export const updateEstimation = async (req, res) => {
     const itemRate = await getItemRateByIdModel(resolvedItemRateId);
     if (!itemRate) {
       return errorResponse(res, "Item rate not found", 404);
+    }
+
+    const duplicateEstimation = await getDuplicateEstimationByItemRateModel(resolvedItemRateId);
+    if (duplicateEstimation && Number(duplicateEstimation.id) !== Number(id)) {
+      return errorResponse(res, "Estimation already exists for this item", 409);
     }
 
     // Resolve customer
@@ -358,26 +379,12 @@ export const printEstimations = async (req, res) => {
 
     const company = await getCompanySummaryModel();
 
-    const totalPurchases = roundMoney(
-      estimations.reduce((sum, e) => sum + toNumber(e.purchaseTotal, 0), 0)
-    );
-    const totalDiscount = roundMoney(
-      estimations.reduce((sum, e) => sum + toNumber(e.discountAmount, 0), 0)
-    );
-    const totalFinal = roundMoney(
-      estimations.reduce((sum, e) => sum + toNumber(e.finalTotal, 0), 0)
-    );
-    const profit = roundMoney(totalFinal - totalPurchases);
+    const summary = buildEstimationsSummary(estimations);
 
     return successResponse(res, "Estimations fetched successfully for print", {
       company,
       estimations,
-      summary: {
-        totalPurchases,
-        totalDiscount,
-        totalFinal,
-        profit,
-      },
+      summary,
     });
   } catch (error) {
     console.error("printEstimations error:", error);

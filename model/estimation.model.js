@@ -161,6 +161,20 @@ export const getEstimationByIdModel = async (id) => {
   return rows[0];
 };
 
+export const getDuplicateEstimationByItemRateModel = async (itemRateId) => {
+  const [rows] = await db.execute(
+    `
+    SELECT id, estimate_id AS estimateId, item_rate_id AS itemRateId, item_name AS itemName
+    FROM estimations
+    WHERE item_rate_id = ?
+    LIMIT 1
+    `,
+    [itemRateId]
+  );
+
+  return rows[0];
+};
+
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
 export const updateEstimationModel = async (id, fields) => {
   const {
