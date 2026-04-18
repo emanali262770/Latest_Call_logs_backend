@@ -1,19 +1,20 @@
+import { db } from "../config/db.js";
 import {
-  createEstimationModel,
+  createEstimationHeaderModel,
+  createEstimationItemsModel,
+  deleteEstimationItemsModel,
   deleteEstimationModel,
-  getDuplicateEstimationByItemRateModel,
   getEstimationByIdModel,
+  getEstimationItemsByEstimationIdModel,
   getEstimationsModel,
   getNextEstimateIdModel,
-  updateEstimationModel,
+  updateEstimationHeaderModel,
 } from "../model/estimation.model.js";
 import { getCustomerByIdModel } from "../model/customer.model.js";
 import { getServiceByIdModel } from "../model/service.model.js";
 import { getItemRateByIdModel } from "../model/itemRate.model.js";
 import { getCompanySummaryModel } from "../model/company.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const toNumber = (value, fallback = 0) => {
   if (value === undefined || value === null || value === "") return fallback;
@@ -24,8 +25,8 @@ const toNumber = (value, fallback = 0) => {
 const toNullable = (value) => {
   if (value === undefined || value === null) return null;
   if (typeof value === "string") {
-    const t = value.trim();
-    return t === "" ? null : t;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
   }
   return value;
 };
@@ -35,16 +36,13 @@ const roundMoney = (value) =>
 
 const buildEstimationsSummary = (estimations) => {
   const totalPurchases = roundMoney(
-    estimations.reduce((sum, e) => sum + toNumber(e.purchaseTotal, 0), 0)
+    estimations.reduce((sum, item) => sum + toNumber(item.purchaseTotal, 0), 0)
   );
   const totalDiscount = roundMoney(
-    estimations.reduce(
-      (sum, e) => sum + roundMoney(toNumber(e.saleTotalWithTax, 0) - toNumber(e.finalTotal, 0)),
-      0
-    )
+    estimations.reduce((sum, item) => sum + toNumber(item.discountTotal, 0), 0)
   );
   const totalFinal = roundMoney(
-    estimations.reduce((sum, e) => sum + toNumber(e.finalTotal, 0), 0)
+    estimations.reduce((sum, item) => sum + toNumber(item.finalTotal, 0), 0)
   );
   const profit = roundMoney(totalFinal - totalPurchases);
 
@@ -56,27 +54,26 @@ const buildEstimationsSummary = (estimations) => {
   };
 };
 
-/**
- * Recalculate all derived fields from base inputs.
- * purchase_price  = reseller_price (PKR) from item_rate
- * sale_price      = item_rate.sale_price  (before tax)
- * sale_price_with_tax = item_rate.sale_price_with_tax
- */
-const calcFields = ({ qty, purchase_price, sale_price, sale_price_with_tax, discount_percent }) => {
-  const q   = toNumber(qty, 0);
-  const pp  = toNumber(purchase_price, 0);
-  const sp  = toNumber(sale_price, 0);
+const calcFields = ({
+  qty,
+  purchase_price,
+  sale_price,
+  sale_price_with_tax,
+  discount_percent,
+}) => {
+  const q = toNumber(qty, 0);
+  const pp = toNumber(purchase_price, 0);
+  const sp = toNumber(sale_price, 0);
   const spwt = toNumber(sale_price_with_tax, 0);
   const disc = toNumber(discount_percent, 0);
 
-  const purchase_total      = roundMoney(pp * q);
-  const sale_total          = roundMoney(sp * q);
+  const purchase_total = roundMoney(pp * q);
+  const sale_total = roundMoney(sp * q);
   const sale_total_with_tax = roundMoney(spwt * q);
-
   const perUnitDiscount = roundMoney((spwt * disc) / 100);
   const discount_amount = roundMoney(perUnitDiscount * q);
-  const final_price     = roundMoney(spwt - perUnitDiscount);
-  const final_total     = roundMoney(final_price * q);
+  const final_price = roundMoney(spwt - perUnitDiscount);
+  const final_total = roundMoney(final_price * q);
 
   return {
     purchase_total,
@@ -88,133 +85,195 @@ const calcFields = ({ qty, purchase_price, sale_price, sale_price_with_tax, disc
   };
 };
 
-// ─── CREATE ──────────────────────────────────────────────────────────────────
-export const createEstimation = async (req, res) => {
-  try {
-    const {
-      estimate_date,
-      customer_id,
-      service_id,
-      item_rate_id,
-      qty,
-      description,
-      discount_percent,
-      status,
-    } = req.body;
+const buildTotals = (items) => ({
+  grand_purchase_total: roundMoney(
+    items.reduce((sum, item) => sum + toNumber(item.purchase_total, 0), 0)
+  ),
+  grand_sale_total: roundMoney(
+    items.reduce((sum, item) => sum + toNumber(item.sale_total_with_tax, 0), 0)
+  ),
+  grand_discount_total: roundMoney(
+    items.reduce((sum, item) => sum + toNumber(item.discount_amount, 0), 0)
+  ),
+  grand_final_total: roundMoney(
+    items.reduce((sum, item) => sum + toNumber(item.final_total, 0), 0)
+  ),
+});
 
-    // Required
+const normalizeItems = async (items) => {
+  if (!Array.isArray(items) || !items.length) {
+    return { error: "At least one item is required" };
+  }
+
+  const normalizedItems = [];
+
+  for (const rawItem of items) {
+    const itemRateId = toNullable(rawItem.item_rate_id);
+    if (!itemRateId) {
+      return { error: "Each item must include item_rate_id" };
+    }
+
+    const parsedQty = toNumber(rawItem.qty, 0);
+    if (parsedQty <= 0) {
+      return { error: "Each item qty must be greater than 0" };
+    }
+
+    const itemRate = await getItemRateByIdModel(itemRateId);
+    if (!itemRate) {
+      return { error: `Item rate not found for item_rate_id ${itemRateId}` };
+    }
+
+    const purchase_price = toNumber(itemRate.resellerPrice, 0);
+    const sale_price = toNumber(itemRate.salePrice, 0);
+    const sale_price_with_tax = toNumber(itemRate.salePriceWithTax, 0);
+    const discount_percent = toNumber(rawItem.discount_percent, 0);
+
+    const calculated = calcFields({
+      qty: parsedQty,
+      purchase_price,
+      sale_price,
+      sale_price_with_tax,
+      discount_percent,
+    });
+
+    normalizedItems.push({
+      item_rate_id: itemRateId,
+      item_name: itemRate.item ?? null,
+      qty: parsedQty,
+      description: toNullable(rawItem.description),
+      purchase_price,
+      purchase_total: calculated.purchase_total,
+      sale_price,
+      sale_total: calculated.sale_total,
+      sale_price_with_tax,
+      sale_total_with_tax: calculated.sale_total_with_tax,
+      discount_percent,
+      discount_amount: calculated.discount_amount,
+      final_price: calculated.final_price,
+      final_total: calculated.final_total,
+    });
+  }
+
+  return { items: normalizedItems };
+};
+
+const attachItemsAndSummary = async (estimation) => {
+  if (!estimation) return null;
+
+  const items = await getEstimationItemsByEstimationIdModel(estimation.id);
+
+  return {
+    ...estimation,
+    items,
+    summary: {
+      purchaseTotal: toNumber(estimation.purchaseTotal, 0),
+      saleTotal: toNumber(estimation.saleTotal, 0),
+      discountTotal: toNumber(estimation.discountTotal, 0),
+      finalTotal: toNumber(estimation.finalTotal, 0),
+    },
+  };
+};
+
+const attachItemsToEstimations = async (estimations) => {
+  return Promise.all(
+    estimations.map(async (estimation) => {
+      const items = await getEstimationItemsByEstimationIdModel(estimation.id);
+      return {
+        ...estimation,
+        items,
+      };
+    })
+  );
+};
+
+export const createEstimation = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    const { estimate_date, customer_id, service_id, status, items } = req.body;
+
     if (!estimate_date) {
       return errorResponse(res, "estimate_date is required", 400);
     }
 
-    if (!item_rate_id) {
-      return errorResponse(res, "item_rate_id is required", 400);
+    const normalized = await normalizeItems(items);
+    if (normalized.error) {
+      return errorResponse(res, normalized.error, 400);
     }
 
-    const parsedQty = toNumber(qty, 0);
-    if (parsedQty <= 0) {
-      return errorResponse(res, "qty must be greater than 0", 400);
-    }
-
-    // Load item rate to snapshots prices
-    const itemRate = await getItemRateByIdModel(item_rate_id);
-    if (!itemRate) {
-      return errorResponse(res, "Item rate not found", 404);
-    }
-
-    const duplicateEstimation = await getDuplicateEstimationByItemRateModel(item_rate_id);
-    if (duplicateEstimation) {
-      return errorResponse(res, "Estimation already exists for this item", 409);
-    }
-
-    // Validate customer if provided
     let customerPerson = null;
     let customerDesignation = null;
+    const resolvedCustomerId = toNullable(customer_id);
 
-    if (customer_id) {
-      const customer = await getCustomerByIdModel(customer_id);
+    if (resolvedCustomerId) {
+      const customer = await getCustomerByIdModel(resolvedCustomerId);
       if (!customer) {
         return errorResponse(res, "Customer not found", 404);
       }
-      customerPerson      = customer.person      ?? null;
+      customerPerson = customer.person ?? null;
       customerDesignation = customer.designation ?? null;
     }
 
-    // Validate service if provided
-    if (service_id) {
-      const service = await getServiceByIdModel(service_id);
+    const resolvedServiceId = toNullable(service_id);
+    if (resolvedServiceId) {
+      const service = await getServiceByIdModel(resolvedServiceId);
       if (!service) {
         return errorResponse(res, "Service not found", 404);
       }
     }
 
-    // Prices from item rate
-    const purchase_price      = toNumber(itemRate.resellerPrice,    0); // PKR reseller price
-    const sale_price          = toNumber(itemRate.salePrice,         0);
-    const sale_price_with_tax = toNumber(itemRate.salePriceWithTax,  0);
-    const disc                = toNumber(discount_percent, 0);
-
-    const {
-      purchase_total,
-      sale_total,
-      sale_total_with_tax,
-      discount_amount,
-      final_price,
-      final_total,
-    } = calcFields({ qty: parsedQty, purchase_price, sale_price, sale_price_with_tax, discount_percent: disc });
-
-    // Auto-generate estimate ID
     const estimate_id = await getNextEstimateIdModel();
+    const totals = buildTotals(normalized.items);
 
-    await createEstimationModel({
+    await connection.beginTransaction();
+
+    const headerResult = await createEstimationHeaderModel(connection, {
       estimate_id,
       estimate_date,
-      customer_id:          toNullable(customer_id),
-      person:               customerPerson,
-      designation:          customerDesignation,
-      service_id:           toNullable(service_id),
-      created_by:           req.user?.id ?? null,
-      item_rate_id,
-      item_name:            itemRate.item ?? null,
-      qty:                  parsedQty,
-      description:          toNullable(description),
-      purchase_price,
-      purchase_total,
-      sale_price,
-      sale_total,
-      sale_price_with_tax,
-      sale_total_with_tax,
-      discount_percent:     disc,
-      discount_amount,
-      final_price,
-      final_total,
-      status:               status ?? "active",
+      customer_id: resolvedCustomerId,
+      person: customerPerson,
+      designation: customerDesignation,
+      service_id: resolvedServiceId,
+      created_by: req.user?.id ?? null,
+      ...totals,
+      status: status ?? "active",
     });
 
-    const created = await getEstimationsModel({ search: "", status: null, customer_id: null });
-    const newRecord = created.find((e) => e.estimateId === estimate_id);
+    await createEstimationItemsModel(
+      connection,
+      headerResult.insertId,
+      normalized.items
+    );
 
-    return successResponse(res, "Estimation created successfully", newRecord, 201);
+    await connection.commit();
+
+    const created = await getEstimationByIdModel(headerResult.insertId);
+    const response = await attachItemsAndSummary(created);
+
+    return successResponse(res, "Estimation created successfully", response, 201);
   } catch (error) {
+    await connection.rollback();
     console.error("createEstimation error:", error);
     return errorResponse(res, "Failed to create estimation", 500);
+  } finally {
+    connection.release();
   }
 };
 
-// ─── GET ALL ──────────────────────────────────────────────────────────────────
 export const getEstimations = async (req, res) => {
   try {
     const { search, status, customer_id } = req.query;
     const estimations = await getEstimationsModel({
-      search:      search      || "",
-      status:      status      || null,
+      search: search || "",
+      status: status || null,
       customer_id: customer_id || null,
     });
 
+    const estimationsWithItems = await attachItemsToEstimations(estimations);
     const summary = buildEstimationsSummary(estimations);
 
     return successResponse(res, "Estimations fetched successfully", {
-      estimations,
+      estimations: estimationsWithItems,
       summary,
     });
   } catch (error) {
@@ -223,7 +282,6 @@ export const getEstimations = async (req, res) => {
   }
 };
 
-// ─── GET BY ID ────────────────────────────────────────────────────────────────
 export const getEstimationById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -233,27 +291,20 @@ export const getEstimationById = async (req, res) => {
       return errorResponse(res, "Estimation not found", 404);
     }
 
-    return successResponse(res, "Estimation fetched successfully", estimation);
+    const response = await attachItemsAndSummary(estimation);
+    return successResponse(res, "Estimation fetched successfully", response);
   } catch (error) {
     console.error("getEstimationById error:", error);
     return errorResponse(res, "Failed to fetch estimation", 500);
   }
 };
 
-// ─── UPDATE ───────────────────────────────────────────────────────────────────
 export const updateEstimation = async (req, res) => {
+  const connection = await db.getConnection();
+
   try {
     const { id } = req.params;
-    const {
-      estimate_date,
-      customer_id,
-      service_id,
-      item_rate_id,
-      qty,
-      description,
-      discount_percent,
-      status,
-    } = req.body;
+    const { estimate_date, customer_id, service_id, status, items } = req.body;
 
     const existing = await getEstimationByIdModel(id);
     if (!existing) {
@@ -264,39 +315,30 @@ export const updateEstimation = async (req, res) => {
       return errorResponse(res, "estimate_date is required", 400);
     }
 
-    const parsedQty = toNumber(qty, 0);
-    if (parsedQty <= 0) {
-      return errorResponse(res, "qty must be greater than 0", 400);
+    const normalized = await normalizeItems(items);
+    if (normalized.error) {
+      return errorResponse(res, normalized.error, 400);
     }
 
-    // Resolve item rate (use new one if provided, else keep existing)
-    const resolvedItemRateId = item_rate_id ?? existing.itemRateId;
-    const itemRate = await getItemRateByIdModel(resolvedItemRateId);
-    if (!itemRate) {
-      return errorResponse(res, "Item rate not found", 404);
-    }
-
-    const duplicateEstimation = await getDuplicateEstimationByItemRateModel(resolvedItemRateId);
-    if (duplicateEstimation && Number(duplicateEstimation.id) !== Number(id)) {
-      return errorResponse(res, "Estimation already exists for this item", 409);
-    }
-
-    // Resolve customer
-    let customerPerson      = existing.person;
-    let customerDesignation = existing.designation;
-    const resolvedCustomerId = customer_id !== undefined ? toNullable(customer_id) : existing.customerId;
+    const resolvedCustomerId =
+      customer_id !== undefined ? toNullable(customer_id) : existing.customerId;
+    let customerPerson = existing.person ?? null;
+    let customerDesignation = existing.designation ?? null;
 
     if (resolvedCustomerId) {
       const customer = await getCustomerByIdModel(resolvedCustomerId);
       if (!customer) {
         return errorResponse(res, "Customer not found", 404);
       }
-      customerPerson      = customer.person      ?? null;
+      customerPerson = customer.person ?? null;
       customerDesignation = customer.designation ?? null;
+    } else {
+      customerPerson = null;
+      customerDesignation = null;
     }
 
-    // Validate service if provided
-    const resolvedServiceId = service_id !== undefined ? toNullable(service_id) : existing.serviceId;
+    const resolvedServiceId =
+      service_id !== undefined ? toNullable(service_id) : existing.serviceId;
     if (resolvedServiceId) {
       const service = await getServiceByIdModel(resolvedServiceId);
       if (!service) {
@@ -304,86 +346,79 @@ export const updateEstimation = async (req, res) => {
       }
     }
 
-    const purchase_price      = toNumber(itemRate.resellerPrice,   0);
-    const sale_price          = toNumber(itemRate.salePrice,        0);
-    const sale_price_with_tax = toNumber(itemRate.salePriceWithTax, 0);
-    const disc                = toNumber(discount_percent, 0);
+    const totals = buildTotals(normalized.items);
 
-    const {
-      purchase_total,
-      sale_total,
-      sale_total_with_tax,
-      discount_amount,
-      final_price,
-      final_total,
-    } = calcFields({ qty: parsedQty, purchase_price, sale_price, sale_price_with_tax, discount_percent: disc });
+    await connection.beginTransaction();
 
-    await updateEstimationModel(id, {
+    await updateEstimationHeaderModel(connection, id, {
       estimate_date,
-      customer_id:          resolvedCustomerId,
-      person:               customerPerson,
-      designation:          customerDesignation,
-      service_id:           resolvedServiceId,
-      item_rate_id:         resolvedItemRateId,
-      item_name:            itemRate.item ?? null,
-      qty:                  parsedQty,
-      description:          toNullable(description),
-      purchase_price,
-      purchase_total,
-      sale_price,
-      sale_total,
-      sale_price_with_tax,
-      sale_total_with_tax,
-      discount_percent:     disc,
-      discount_amount,
-      final_price,
-      final_total,
-      status:               status ?? existing.status,
+      customer_id: resolvedCustomerId,
+      person: customerPerson,
+      designation: customerDesignation,
+      service_id: resolvedServiceId,
+      ...totals,
+      status: status ?? existing.status,
     });
 
+    await deleteEstimationItemsModel(connection, id);
+    await createEstimationItemsModel(connection, id, normalized.items);
+
+    await connection.commit();
+
     const updated = await getEstimationByIdModel(id);
-    return successResponse(res, "Estimation updated successfully", updated);
+    const response = await attachItemsAndSummary(updated);
+
+    return successResponse(res, "Estimation updated successfully", response);
   } catch (error) {
+    await connection.rollback();
     console.error("updateEstimation error:", error);
     return errorResponse(res, "Failed to update estimation", 500);
+  } finally {
+    connection.release();
   }
 };
 
-// ─── DELETE ───────────────────────────────────────────────────────────────────
 export const deleteEstimation = async (req, res) => {
+  const connection = await db.getConnection();
+
   try {
     const { id } = req.params;
-
     const existing = await getEstimationByIdModel(id);
+
     if (!existing) {
       return errorResponse(res, "Estimation not found", 404);
     }
 
-    await deleteEstimationModel(id);
+    await connection.beginTransaction();
+    await deleteEstimationModel(connection, id);
+    await connection.commit();
+
     return successResponse(res, "Estimation deleted successfully");
   } catch (error) {
+    await connection.rollback();
     console.error("deleteEstimation error:", error);
     return errorResponse(res, "Failed to delete estimation", 500);
+  } finally {
+    connection.release();
   }
 };
 
-// ─── PRINT ALL ────────────────────────────────────────────────────────────────
 export const printEstimations = async (req, res) => {
   try {
     const { search, status, customer_id } = req.query;
     const estimations = await getEstimationsModel({
-      search:      search      || "",
-      status:      status      || null,
+      search: search || "",
+      status: status || null,
       customer_id: customer_id || null,
     });
 
     const company = await getCompanySummaryModel();
-
+    const estimationsWithItems = await attachItemsToEstimations(estimations);
     const summary = buildEstimationsSummary(estimations);
 
     return successResponse(res, "Estimations fetched successfully for print", {
       company,
-      estimations,
+      estimations: estimationsWithItems,
       summary,
     });
   } catch (error) {
@@ -392,7 +427,6 @@ export const printEstimations = async (req, res) => {
   }
 };
 
-// ─── PRINT SINGLE ─────────────────────────────────────────────────────────────
 export const printEstimationById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -403,10 +437,11 @@ export const printEstimationById = async (req, res) => {
     }
 
     const company = await getCompanySummaryModel();
+    const response = await attachItemsAndSummary(estimation);
 
     return successResponse(res, "Estimation fetched successfully for print", {
       company,
-      estimation,
+      estimation: response,
     });
   } catch (error) {
     console.error("printEstimationById error:", error);

@@ -32,5 +32,5 @@ CREATE TABLE IF NOT EXISTS item_rates (
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
   FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id) ON DELETE SET NULL,
   FOREIGN KEY (manufacturer_id) REFERENCES manufacturers(id) ON DELETE SET NULL,
-  FOREIGN KEY (item_definition_id) REFERENCES item_definitions(id) ON DELETE RESTRICT
+  FOREIGN KEY (item_definition_id) REFERENCES item_definitions(id) ON DELETE CASCADE
 );
