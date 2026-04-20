@@ -1,0 +1,2 @@
+ALTER TABLE customers
+  MODIFY COLUMN department VARCHAR(255) NOT NULL;

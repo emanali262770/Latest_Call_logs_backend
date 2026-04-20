@@ -57,7 +57,9 @@ export const createCustomer = async (req, res) => {
     const company = toNullable(req.body.company);
     const person = toNullable(req.body.person);
     const designation = toNullable(req.body.designation);
+    const department = toNullable(req.body.department);
     const mobile = toNullable(req.body.mobile);
+    const whatsappNo = toNullable(req.body.whatsapp_no ?? req.body.whatsappNo);
     const customerGroupId = toNumberOrNull(
       req.body.customer_group_id ?? req.body.customerGroupId ?? req.body.group_id ?? req.body.groupId
     );
@@ -74,8 +76,16 @@ export const createCustomer = async (req, res) => {
       return errorResponse(res, "mobile is required", 400);
     }
 
+    if (!whatsappNo) {
+      return errorResponse(res, "whatsapp_no is required", 400);
+    }
+
     if (!designation) {
       return errorResponse(res, "designation is required", 400);
+    }
+
+    if (!department) {
+      return errorResponse(res, "department is required", 400);
     }
 
     if (company) {
@@ -100,13 +110,14 @@ export const createCustomer = async (req, res) => {
       company,
       person,
       designation,
-      department: toNullable(req.body.department),
+      department,
       office_address: toNullable(req.body.office_address ?? req.body.officeAddress),
       office_phone: toNullable(req.body.office_phone ?? req.body.officePhone),
       fax: toNullable(req.body.fax),
       residence_address: toNullable(req.body.residence_address ?? req.body.residenceAddress),
       residence_phone: toNullable(req.body.residence_phone ?? req.body.residencePhone),
       mobile,
+      whatsapp_no: whatsappNo,
       email: toNullable(req.body.email),
       website: toNullable(req.body.website),
       description: toNullable(req.body.description),
@@ -173,9 +184,16 @@ export const updateCustomer = async (req, res) => {
     const nextDesignation = hasOwn(req.body, "designation")
       ? toNullable(req.body.designation)
       : customer.designation;
+    const nextDepartment = hasOwn(req.body, "department")
+      ? toNullable(req.body.department)
+      : customer.department;
     const nextMobile = hasOwn(req.body, "mobile")
       ? toNullable(req.body.mobile)
       : customer.mobile;
+    const nextWhatsappNo =
+      hasOwn(req.body, "whatsapp_no") || hasOwn(req.body, "whatsappNo")
+        ? toNullable(req.body.whatsapp_no ?? req.body.whatsappNo)
+        : (customer.whatsapp_no ?? customer.whatsappNo);
 
     if (!nextPerson) {
       return errorResponse(res, "person is required", 400);
@@ -189,8 +207,16 @@ export const updateCustomer = async (req, res) => {
       return errorResponse(res, "mobile is required", 400);
     }
 
+    if (!nextWhatsappNo) {
+      return errorResponse(res, "whatsapp_no is required", 400);
+    }
+
     if (!nextDesignation) {
       return errorResponse(res, "designation is required", 400);
+    }
+
+    if (!nextDepartment) {
+      return errorResponse(res, "department is required", 400);
     }
 
     if (nextCompany) {
@@ -229,9 +255,7 @@ export const updateCustomer = async (req, res) => {
       company: nextCompany,
       person: nextPerson,
       designation: nextDesignation,
-      department: hasOwn(req.body, "department")
-        ? toNullable(req.body.department)
-        : customer.department,
+      department: nextDepartment,
       office_address:
         hasOwn(req.body, "office_address") || hasOwn(req.body, "officeAddress")
           ? toNullable(req.body.office_address ?? req.body.officeAddress)
@@ -250,6 +274,7 @@ export const updateCustomer = async (req, res) => {
           ? toNullable(req.body.residence_phone ?? req.body.residencePhone)
           : (customer.residence_phone ?? customer.residencePhone),
       mobile: nextMobile,
+      whatsapp_no: nextWhatsappNo,
       email: hasOwn(req.body, "email") ? toNullable(req.body.email) : customer.email,
       website: hasOwn(req.body, "website") ? toNullable(req.body.website) : customer.website,
       description:

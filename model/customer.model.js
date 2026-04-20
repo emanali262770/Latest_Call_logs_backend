@@ -21,6 +21,8 @@ const customerSelectClause = `
     c.residence_phone AS residencePhone,
     c.residence_phone,
     c.mobile,
+    c.whatsapp_no AS whatsappNo,
+    c.whatsapp_no,
     c.email,
     c.website,
     c.description,
@@ -45,6 +47,7 @@ export const createCustomerModel = async ({
   residence_address,
   residence_phone,
   mobile,
+  whatsapp_no,
   email,
   website,
   description,
@@ -64,12 +67,13 @@ export const createCustomerModel = async ({
       residence_address,
       residence_phone,
       mobile,
+      whatsapp_no,
       email,
       website,
       description,
       status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       customer_group_id,
@@ -83,6 +87,7 @@ export const createCustomerModel = async ({
       residence_address,
       residence_phone,
       mobile.trim(),
+      whatsapp_no.trim(),
       email,
       website,
       description,
@@ -108,12 +113,14 @@ export const getCustomersModel = async (search = "", status) => {
         OR COALESCE(c.office_phone, '') LIKE ?
         OR COALESCE(c.residence_phone, '') LIKE ?
         OR c.mobile LIKE ?
+        OR c.whatsapp_no LIKE ?
         OR COALESCE(c.email, '') LIKE ?
         OR COALESCE(c.website, '') LIKE ?
       )`
     );
     const searchValue = `%${search}%`;
     params.push(
+      searchValue,
       searchValue,
       searchValue,
       searchValue,
@@ -202,6 +209,7 @@ export const updateCustomerModel = async ({
   residence_address,
   residence_phone,
   mobile,
+  whatsapp_no,
   email,
   website,
   description,
@@ -222,6 +230,7 @@ export const updateCustomerModel = async ({
       residence_address = ?,
       residence_phone = ?,
       mobile = ?,
+      whatsapp_no = ?,
       email = ?,
       website = ?,
       description = ?,
@@ -240,6 +249,7 @@ export const updateCustomerModel = async ({
       residence_address,
       residence_phone,
       mobile.trim(),
+      whatsapp_no.trim(),
       email,
       website,
       description,

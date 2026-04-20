@@ -11,13 +11,14 @@ ALTER TABLE customers
   ADD COLUMN company VARCHAR(255) NULL AFTER customer_group_id,
   ADD COLUMN person VARCHAR(255) NOT NULL AFTER company,
   ADD COLUMN designation VARCHAR(255) NULL AFTER person,
-  ADD COLUMN department VARCHAR(255) NULL AFTER designation,
+  ADD COLUMN department VARCHAR(255) NOT NULL AFTER designation,
   ADD COLUMN office_address TEXT NULL AFTER department,
   ADD COLUMN office_phone VARCHAR(50) NULL AFTER office_address,
   ADD COLUMN fax VARCHAR(50) NULL AFTER office_phone,
   ADD COLUMN residence_address TEXT NULL AFTER fax,
   ADD COLUMN residence_phone VARCHAR(50) NULL AFTER residence_address,
   ADD COLUMN mobile VARCHAR(50) NOT NULL AFTER residence_phone,
+  ADD COLUMN whatsapp_no VARCHAR(50) NOT NULL AFTER mobile,
   ADD COLUMN website VARCHAR(255) NULL AFTER email,
   ADD COLUMN description TEXT NULL AFTER website;
 
