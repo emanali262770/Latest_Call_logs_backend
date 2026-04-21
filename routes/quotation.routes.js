@@ -7,6 +7,7 @@ import {
   getQuotationById,
   getQuotationByRevisionId,
   getQuotations,
+  printQuotationById,
   reviseQuotation,
   sendQuotation,
   updateQuotation,
@@ -56,6 +57,13 @@ router.get(
   protect,
   checkPermission("INVENTORY.QUOTATION.READ"),
   getQuotationById
+);
+
+router.get(
+  "/:id/print",
+  protect,
+  checkPermission("INVENTORY.QUOTATION.PRINT"),
+  printQuotationById
 );
 
 router.post(

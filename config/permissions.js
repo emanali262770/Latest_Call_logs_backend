@@ -574,6 +574,13 @@ export const ALL_PERMISSIONS = [
     description: "Delete quotation",
   },
   {
+    module: "INVENTORY",
+    sub_module: "QUOTATION",
+    action: "PRINT",
+    key_name: "INVENTORY.QUOTATION.PRINT",
+    description: "Print quotation",
+  },
+  {
     module: "SERVICES",
     sub_module: "SERVICE",
     action: "CREATE",

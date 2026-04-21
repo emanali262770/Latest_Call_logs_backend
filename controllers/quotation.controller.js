@@ -16,6 +16,7 @@ import {
 import { getCustomerByIdModel } from "../model/customer.model.js";
 import { getServiceByIdModel } from "../model/service.model.js";
 import { getItemRateByIdModel } from "../model/itemRate.model.js";
+import { getCompanySummaryModel } from "../model/company.model.js";
 import { sendQuotationDelivery } from "../services/quotationDelivery.service.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
@@ -470,6 +471,31 @@ export const sendQuotation = async (req, res) => {
   } catch (error) {
     console.error("sendQuotation error:", error);
     return errorResponse(res, "Failed to send quotation", 500);
+  }
+};
+
+export const printQuotationById = async (req, res) => {
+  try {
+    const quotation = await getQuotationByIdModel(req.params.id);
+    if (!quotation) {
+      return errorResponse(res, "Quotation not found", 404);
+    }
+
+    const company = await getCompanySummaryModel();
+    const quotationWithItems = await attachItemsAndSummary(quotation);
+    return successResponse(res, "Quotation fetched successfully for print", {
+      company,
+      quotation: {
+        ...quotationWithItems,
+        company: quotationWithItems.customerName,
+        forProduct: quotationWithItems.serviceName,
+        taxMode:
+          quotationWithItems.taxMode === "withTax" ? "With Tax" : "Without Tax",
+      },
+    });
+  } catch (error) {
+    console.error("printQuotationById error:", error);
+    return errorResponse(res, "Failed to fetch quotation for print", 500);
   }
 };
 

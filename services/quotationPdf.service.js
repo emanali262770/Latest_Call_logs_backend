@@ -36,88 +36,140 @@ const ensureDirectory = async () => {
   await fsPromises.mkdir(quotationPdfDirectory, { recursive: true });
 };
 
-const drawLabelValue = (doc, label, value, x, y, width) => {
-  doc
-    .fontSize(7)
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .text(label.toUpperCase(), x, y, { width, characterSpacing: 2 });
-  doc
-    .fontSize(9)
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .text(text(value), x, y + 16, { width });
+const page = {
+  left: 40,
+  right: 555,
+  width: 515,
 };
 
-const drawDetailsBox = (doc, quotation) => {
-  const x = 35;
-  const y = 198;
-  const width = 525;
-  const rowHeight = 52;
-  const half = width / 2;
-
-  doc.roundedRect(x, y, width, rowHeight * 2 + 36, 6).strokeColor("#cbd5e1").stroke();
+const drawLabelValue = (doc, label, value, x, y, width) => {
   doc
-    .fontSize(7)
-    .fillColor("#111827")
+    .fontSize(6.8)
+    .fillColor("#64748b")
     .font("Helvetica-Bold")
-    .text("Q U O T A T I O N   D E T A I L S", x + 14, y + 14);
+    .text(label.toUpperCase(), x, y, { width, characterSpacing: 1.4 });
+  doc
+    .fontSize(9.2)
+    .fillColor("#0f172a")
+    .font("Helvetica-Bold")
+    .text(text(value), x, y + 14, { width, lineGap: 2 });
+};
 
-  const startY = y + 36;
-  doc.moveTo(x, startY).lineTo(x + width, startY).strokeColor("#cbd5e1").stroke();
-  doc.moveTo(x + half, startY).lineTo(x + half, y + rowHeight * 2 + 36).stroke();
-  doc.moveTo(x, startY + rowHeight).lineTo(x + width, startY + rowHeight).stroke();
+const drawDocumentTitle = (doc, quotation) => {
+  const y = 130;
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(18)
+    .fillColor("#0f172a")
+    .text("Quotation", page.left, y, { width: 250 });
 
-  drawLabelValue(doc, "Customer", quotation.customerName, x + 14, startY + 12, half - 28);
-  drawLabelValue(doc, "Service", quotation.serviceName, x + half + 14, startY + 12, half - 28);
-  drawLabelValue(doc, "Person", quotation.person, x + 14, startY + rowHeight + 12, half - 28);
-  drawLabelValue(
-    doc,
-    "Designation / Department",
-    `${text(quotation.designation)} / ${text(quotation.department)}`,
-    x + half + 14,
-    startY + rowHeight + 12,
-    half - 28
-  );
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .fillColor("#475569")
+    .text(`Prepared for ${text(quotation.customerName)}`, page.left, y + 24, {
+      width: 250,
+    });
+
+  const metaX = 395;
+  const labelWidth = 65;
+  const valueWidth = 95;
+  const metaRows = [
+    ["Quotation No", quotation.quotationNo],
+    ["Revision Ref", quotation.revisionId],
+    ["Date", formatDate(quotation.quotationDate)],
+    ["Printed", new Date().toLocaleDateString("en-GB")],
+  ];
+
+  metaRows.forEach(([label, value], index) => {
+    const rowY = y + index * 16;
+    doc.font("Helvetica-Bold").fontSize(7.2).fillColor("#64748b").text(label, metaX, rowY, {
+      width: labelWidth,
+      align: "right",
+    });
+    doc.font("Helvetica-Bold").fontSize(8.2).fillColor("#0f172a").text(text(value), metaX + 75, rowY, {
+      width: valueWidth,
+      align: "right",
+    });
+  });
+
+  doc.moveTo(page.left, y + 70).lineTo(page.right, y + 70).lineWidth(0.8).strokeColor("#cbd5e1").stroke();
+};
+
+const drawDetailsSection = (doc, quotation) => {
+  const y = 220;
+  const columnWidth = 235;
+  const rightX = 320;
+
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#0f172a").text("CLIENT DETAILS", page.left, y, {
+    characterSpacing: 1.2,
+  });
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#0f172a").text("PROJECT DETAILS", rightX, y, {
+    characterSpacing: 1.2,
+  });
+
+  doc.moveTo(page.left, y + 18).lineTo(275, y + 18).lineWidth(0.7).strokeColor("#94a3b8").stroke();
+  doc.moveTo(rightX, y + 18).lineTo(page.right, y + 18).stroke();
+
+  drawLabelValue(doc, "Customer", quotation.customerName, page.left, y + 34, columnWidth);
+  drawLabelValue(doc, "Contact Person", quotation.person, page.left, y + 74, columnWidth);
+  drawLabelValue(doc, "Designation", quotation.designation, page.left, y + 114, columnWidth);
+
+  drawLabelValue(doc, "Service", quotation.serviceName, rightX, y + 34, columnWidth);
+  drawLabelValue(doc, "Department", quotation.department, rightX, y + 74, columnWidth);
+  drawLabelValue(doc, "Tax Mode", quotation.taxMode === "withTax" ? "With Tax" : "Without Tax", rightX, y + 114, columnWidth);
 };
 
 const drawItemsTable = (doc, quotation) => {
-  const x = 35;
-  let y = 355;
-  const rowHeight = 26;
+  const x = page.left;
+  let y = 390;
+  const tableWidth = page.width;
+  const headerHeight = 24;
+  const rowHeight = 30;
   const columns =
     quotation.taxMode === "withTax"
       ? [
-          ["Sr.", 25],
-          ["Item", 150],
-          ["Rate", 62],
-          ["Qty", 42],
-          ["GST", 62],
-          ["Rate+GST", 78],
-          ["Total", 106],
+          ["Sr.", 30, "left"],
+          ["Description", 170, "left"],
+          ["Rate", 65, "right"],
+          ["Qty", 45, "right"],
+          ["GST", 60, "right"],
+          ["Rate+GST", 70, "right"],
+          ["Amount", 75, "right"],
         ]
       : [
-          ["Sr.", 25],
-          ["Item", 190],
-          ["Rate", 75],
-          ["Qty", 50],
-          ["Total", 95],
-          ["Status", 90],
+          ["Sr.", 30, "left"],
+          ["Description", 245, "left"],
+          ["Rate", 75, "right"],
+          ["Qty", 55, "right"],
+          ["Amount", 110, "right"],
         ];
 
-  doc.rect(x, y, 525, rowHeight).fillAndStroke("#f8fafc", "#94a3b8");
-  doc.fillColor("#111827").fontSize(8).font("Helvetica-Bold");
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#0f172a").text("LINE ITEMS", x, y - 22, {
+    characterSpacing: 1.2,
+  });
 
+  doc.rect(x, y, tableWidth, headerHeight).fill("#0f172a");
   let currentX = x;
-  columns.forEach(([label, width]) => {
-    doc.text(label, currentX + 5, y + 9, { width: width - 10 });
+  columns.forEach(([label, width, align]) => {
+    doc
+      .fillColor("#ffffff")
+      .font("Helvetica-Bold")
+      .fontSize(7.2)
+      .text(label.toUpperCase(), currentX + 8, y + 8, {
+        width: width - 16,
+        align,
+        characterSpacing: 0.6,
+      });
     currentX += width;
   });
 
-  y += rowHeight;
+  y += headerHeight;
   quotation.items.forEach((item, index) => {
-    doc.rect(x, y, 525, rowHeight).strokeColor("#94a3b8").stroke();
-    doc.fillColor("#111827").fontSize(8).font("Helvetica");
+    if (index % 2 === 1) {
+      doc.rect(x, y, tableWidth, rowHeight).fill("#f8fafc");
+    }
+    doc.moveTo(x, y + rowHeight).lineTo(x + tableWidth, y + rowHeight).lineWidth(0.4).strokeColor("#dbe3ec").stroke();
 
     const values =
       quotation.taxMode === "withTax"
@@ -136,29 +188,66 @@ const drawItemsTable = (doc, quotation) => {
             money(item.rate),
             money(item.qty),
             money(item.total),
-            quotation.status?.toUpperCase() || "ACTIVE",
           ];
 
     currentX = x;
-    columns.forEach(([, width], columnIndex) => {
-      doc.text(text(values[columnIndex]), currentX + 5, y + 9, {
-        width: width - 10,
-      });
+    columns.forEach(([, width, align], columnIndex) => {
+      const isDescription = columnIndex === 1;
+      doc
+        .fillColor(isDescription ? "#0f172a" : "#334155")
+        .font(isDescription ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(8)
+        .text(text(values[columnIndex]), currentX + 8, y + 10, {
+          width: width - 16,
+          align,
+          lineBreak: false,
+          ellipsis: true,
+        });
       currentX += width;
     });
     y += rowHeight;
   });
 
-  y += 14;
-  doc.font("Helvetica-Bold").fontSize(9).fillColor("#111827");
-  doc.text(`Total Qty: ${money(quotation.summary.totalQty)}`, 350, y, {
+  const summaryY = y + 22;
+  const summaryX = 365;
+  const summaryWidth = 190;
+
+  doc.moveTo(summaryX, summaryY).lineTo(summaryX + summaryWidth, summaryY).lineWidth(0.8).strokeColor("#94a3b8").stroke();
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#475569").text("Total Quantity", summaryX, summaryY + 14, {
+    width: 85,
+  });
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#0f172a").text(money(quotation.summary.totalQty), summaryX + 95, summaryY + 14, {
     width: 95,
     align: "right",
   });
-  doc.text(`Grand Total: ${money(quotation.summary.grandTotal)}`, 445, y, {
-    width: 115,
+
+  doc.rect(summaryX, summaryY + 38, summaryWidth, 34).fill("#f1f5f9");
+  doc.font("Helvetica-Bold").fontSize(9).fillColor("#0f172a").text("Grand Total", summaryX + 12, summaryY + 51, {
+    width: 80,
+  });
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a").text(money(quotation.summary.grandTotal), summaryX + 92, summaryY + 49, {
+    width: 86,
     align: "right",
   });
+
+  return summaryY + 96;
+};
+
+const drawTerms = (doc, y) => {
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#0f172a").text("NOTES", page.left, y, {
+    characterSpacing: 1.2,
+  });
+  doc.moveTo(page.left, y + 16).lineTo(285, y + 16).lineWidth(0.7).strokeColor("#94a3b8").stroke();
+  doc
+    .font("Helvetica")
+    .fontSize(7.6)
+    .fillColor("#475569")
+    .text(
+      "This quotation is prepared based on the listed items and quantities. Prices are subject to confirmation at the time of order placement.",
+      page.left,
+      y + 30,
+      { width: 245, lineGap: 3 }
+    );
 };
 
 export const generateQuotationPdf = async (quotation) => {
@@ -169,50 +258,34 @@ export const generateQuotationPdf = async (quotation) => {
   const fileName = `${safeQuotationNo}-${Date.now()}.pdf`;
   const filePath = path.join(quotationPdfDirectory, fileName);
 
-  const doc = new PDFDocument({ size: "A4", margin: 35 });
+  const doc = new PDFDocument({ size: "A4", margin: 40 });
   const stream = fs.createWriteStream(filePath);
   doc.pipe(stream);
 
-  doc.font("Helvetica-Bold").fontSize(7).fillColor("#4f46e5").text("QUOTATION PRINT", 35, 65, {
+  doc.font("Helvetica-Bold").fontSize(7).fillColor("#4f46e5").text("QUOTATION PRINT", page.left, 52, {
     characterSpacing: 2,
   });
   doc
     .fontSize(15)
-    .fillColor("#111827")
-    .text(company?.company_name || "Afaq Technologies", 35, 80);
+    .fillColor("#0f172a")
+    .text(company?.company_name || "Afaq Technologies", page.left, 67);
 
-  doc.moveTo(35, 130).lineTo(560, 130).lineWidth(2).strokeColor("#4f46e5").stroke();
-  doc.fontSize(14).fillColor("#111827").font("Helvetica-Bold");
-  doc.text(`Quotation - ${quotation.quotationNo}`, 35, 158);
-  doc.fontSize(8).font("Helvetica").text(text(quotation.customerName), 35, 176);
+  doc.moveTo(page.left, 112).lineTo(page.right, 112).lineWidth(2).strokeColor("#4f46e5").stroke();
 
-  doc.fontSize(8).font("Helvetica-Bold").text("Printed", 500, 150, {
-    width: 60,
-    align: "right",
-  });
-  doc.font("Helvetica").text(new Date().toLocaleString(), 430, 164, {
-    width: 130,
-    align: "right",
-  });
-  doc.font("Helvetica-Bold").text(`Ref: ${quotation.revisionId}`, 430, 178, {
-    width: 130,
-    align: "right",
-  });
-
-  doc.font("Helvetica-Bold").fontSize(10).text(formatDate(quotation.quotationDate), 35, 185);
-
-  drawDetailsBox(doc, quotation);
-  drawItemsTable(doc, quotation);
+  drawDocumentTitle(doc, quotation);
+  drawDetailsSection(doc, quotation);
+  const afterTableY = drawItemsTable(doc, quotation);
+  drawTerms(doc, Math.min(afterTableY, 665));
 
   doc
-    .moveTo(35, 760)
-    .lineTo(560, 760)
+    .moveTo(page.left, 760)
+    .lineTo(page.right, 760)
     .lineWidth(0.5)
     .strokeColor("#cbd5e1")
     .stroke();
-  doc.fontSize(7).font("Helvetica").fillColor("#111827");
-  doc.text(`Single Quotation Record - ${company?.company_name || "Afaq Technologies"}`, 35, 775);
-  doc.text(text(quotation.quotationNo), 500, 775, { width: 60, align: "right" });
+  doc.fontSize(7).font("Helvetica").fillColor("#64748b");
+  doc.text(`Prepared by ${company?.company_name || "Afaq Technologies"}`, page.left, 775);
+  doc.text(text(quotation.quotationNo), 470, 775, { width: 85, align: "right" });
 
   doc.end();
 
