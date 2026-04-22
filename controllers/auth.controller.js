@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { generateToken } from "../utils/jwt.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 import { db } from "../config/db.js";
-import { getUserPermissionsModel } from "../model/access.model.js";
+import { getUserGroupsModel, getUserPermissionsModel } from "../model/access.model.js";
 import { getCompanySummaryModel } from "../model/company.model.js";
 import { getUserByUsernameModel } from "../model/user.model.js";
 
@@ -34,6 +34,16 @@ export const login = async (req, res) => {
 
     if (!isMatch) {
       return errorResponse(res, "Invalid credentials", 401);
+    }
+
+    const groups = await getUserGroupsModel(user.id);
+
+    if (!groups.length) {
+      return errorResponse(
+        res,
+        "User is not assigned to any group and cannot login",
+        403
+      );
     }
 
     const resolvedUsername = user.username ?? user.UserName;

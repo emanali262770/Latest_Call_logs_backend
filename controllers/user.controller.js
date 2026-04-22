@@ -245,22 +245,37 @@ export const updateUserLock = async (req, res) => {
   }
 };
 
-// DELETE USER (Soft Delete)
+// DELETE USER
 export const deleteUser = async (req, res) => {
+  const connection = await db.getConnection();
+
   try {
     const userId = req.params.id;
 
-    const [result] = await db.execute(
-      `UPDATE users SET status = 'inactive' WHERE id = ?`,
+    await connection.beginTransaction();
+
+    await connection.execute(
+      `DELETE FROM user_groups WHERE user_id = ?`,
+      [userId]
+    );
+
+    const [result] = await connection.execute(
+      `DELETE FROM users WHERE id = ?`,
       [userId]
     );
 
     if (result.affectedRows === 0) {
+      await connection.rollback();
       return errorResponse(res, "User not found", 404);
     }
 
-    return successResponse(res, "User deactivated successfully");
+    await connection.commit();
+
+    return successResponse(res, "User deleted successfully");
   } catch (error) {
+    await connection.rollback();
     return errorResponse(res, "Failed to delete user", 500, error.message);
+  } finally {
+    connection.release();
   }
 };
