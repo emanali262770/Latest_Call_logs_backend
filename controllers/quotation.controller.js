@@ -204,7 +204,10 @@ const attachItemsAndSummary = async (quotation) => {
 
 const buildDeliveryOptions = (body) => ({
   sendEmail: body.sendEmail === true || body.send_email === true,
-  sendWhatsapp: body.sendWhatsapp === true || body.send_whatsapp === true,
+  sendWhatsapp:
+    body.sendWhatsapp === false || body.send_whatsapp === false
+      ? false
+      : true,
 });
 
 const attachDelivery = async (quotation, body) => {

@@ -22,11 +22,18 @@ export const sendQuotationEmail = async ({ to, quotation, pdfPath }) => {
     },
   });
 
+  const text = `Dear ${quotation.customerName || "Customer"},
+
+Please find attached quotation ${quotation.quotationNo}.
+
+Regards
+${process.env.SMTP_FROM || process.env.SMTP_USER || "Infinity Byte Solution"}`;
+
   await transporter.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
     subject: `Quotation ${quotation.quotationNo}`,
-    text: `Dear ${quotation.customerName || "Customer"},\n\nPlease find attached quotation ${quotation.quotationNo}.\n\nRegards`,
+    text,
     attachments: [
       {
         filename: `${quotation.quotationNo}.pdf`.replace(/[^\w.-]/g, "-"),
