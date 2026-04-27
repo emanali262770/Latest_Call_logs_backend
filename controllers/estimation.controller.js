@@ -14,6 +14,7 @@ import { getCustomerByIdModel } from "../model/customer.model.js";
 import { getServiceByIdModel } from "../model/service.model.js";
 import { getItemRateByIdModel } from "../model/itemRate.model.js";
 import { getCompanySummaryModel } from "../model/company.model.js";
+import { sendEstimationDelivery } from "../services/estimationDelivery.service.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 const toNumber = (value, fallback = 0) => {
@@ -31,8 +32,25 @@ const toNullable = (value) => {
   return value;
 };
 
+const buildDeliveryOptions = (body) => ({
+  sendEmail: body.sendEmail === true || body.send_email === true,
+  sendWhatsapp:
+    body.sendWhatsapp === false || body.send_whatsapp === false ? false : true,
+});
+
+const attachDelivery = async (estimation, body) => {
+  const options = buildDeliveryOptions(body);
+  const delivery = await sendEstimationDelivery({ estimation, ...options });
+  return { ...estimation, delivery };
+};
+
 const roundMoney = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
+const normalizeTaxMode = (value) => {
+  const normalized = toNullable(value);
+  return normalized === "withTax" || normalized === "withoutTax" ? normalized : null;
+};
 
 const buildEstimationsSummary = (estimations) => {
   const totalPurchases = roundMoney(
@@ -60,6 +78,7 @@ const calcFields = ({
   sale_price,
   sale_price_with_tax,
   discount_percent,
+  tax_mode,
 }) => {
   const q = toNumber(qty, 0);
   const pp = toNumber(purchase_price, 0);
@@ -70,9 +89,11 @@ const calcFields = ({
   const purchase_total = roundMoney(pp * q);
   const sale_total = roundMoney(sp * q);
   const sale_total_with_tax = roundMoney(spwt * q);
-  const perUnitDiscount = roundMoney((spwt * disc) / 100);
+
+  const basePrice = tax_mode === "withoutTax" ? sp : spwt;
+  const perUnitDiscount = roundMoney((basePrice * disc) / 100);
   const discount_amount = roundMoney(perUnitDiscount * q);
-  const final_price = roundMoney(spwt - perUnitDiscount);
+  const final_price = roundMoney(Math.max(basePrice - perUnitDiscount, 0));
   const final_total = roundMoney(final_price * q);
 
   return {
@@ -85,12 +106,19 @@ const calcFields = ({
   };
 };
 
-const buildTotals = (items) => ({
+const buildTotals = (items, taxMode) => ({
   grand_purchase_total: roundMoney(
     items.reduce((sum, item) => sum + toNumber(item.purchase_total, 0), 0)
   ),
   grand_sale_total: roundMoney(
-    items.reduce((sum, item) => sum + toNumber(item.sale_total_with_tax, 0), 0)
+    items.reduce(
+      (sum, item) =>
+        sum +
+        (taxMode === "withTax"
+          ? toNumber(item.sale_total_with_tax, 0)
+          : toNumber(item.sale_total, 0)),
+      0
+    )
   ),
   grand_discount_total: roundMoney(
     items.reduce((sum, item) => sum + toNumber(item.discount_amount, 0), 0)
@@ -100,7 +128,7 @@ const buildTotals = (items) => ({
   ),
 });
 
-const normalizeItems = async (items) => {
+const normalizeItems = async (items, taxMode) => {
   if (!Array.isArray(items) || !items.length) {
     return { error: "At least one item is required" };
   }
@@ -134,6 +162,7 @@ const normalizeItems = async (items) => {
       sale_price,
       sale_price_with_tax,
       discount_percent,
+      tax_mode: taxMode,
     });
 
     normalizedItems.push({
@@ -196,7 +225,12 @@ export const createEstimation = async (req, res) => {
       return errorResponse(res, "estimate_date is required", 400);
     }
 
-    const normalized = await normalizeItems(items);
+    const taxMode = normalizeTaxMode(req.body.tax_mode ?? req.body.taxMode);
+    if (!taxMode) {
+      return errorResponse(res, "tax_mode is required (withoutTax or withTax)", 400);
+    }
+
+    const normalized = await normalizeItems(items, taxMode);
     if (normalized.error) {
       return errorResponse(res, normalized.error, 400);
     }
@@ -223,7 +257,7 @@ export const createEstimation = async (req, res) => {
     }
 
     const estimate_id = await getNextEstimateIdModel();
-    const totals = buildTotals(normalized.items);
+    const totals = buildTotals(normalized.items, taxMode);
 
     await connection.beginTransaction();
 
@@ -234,6 +268,7 @@ export const createEstimation = async (req, res) => {
       person: customerPerson,
       designation: customerDesignation,
       service_id: resolvedServiceId,
+      tax_mode: taxMode,
       created_by: req.user?.id ?? null,
       ...totals,
       status: status ?? "active",
@@ -248,7 +283,8 @@ export const createEstimation = async (req, res) => {
     await connection.commit();
 
     const created = await getEstimationByIdModel(headerResult.insertId);
-    const response = await attachItemsAndSummary(created);
+    const withItems = await attachItemsAndSummary(created);
+    const response = await attachDelivery(withItems, req.body);
 
     return successResponse(res, "Estimation created successfully", response, 201);
   } catch (error) {
@@ -315,7 +351,12 @@ export const updateEstimation = async (req, res) => {
       return errorResponse(res, "estimate_date is required", 400);
     }
 
-    const normalized = await normalizeItems(items);
+    const taxMode = normalizeTaxMode(req.body.tax_mode ?? req.body.taxMode ?? existing.taxMode);
+    if (!taxMode) {
+      return errorResponse(res, "tax_mode is required (withoutTax or withTax)", 400);
+    }
+
+    const normalized = await normalizeItems(items, taxMode);
     if (normalized.error) {
       return errorResponse(res, normalized.error, 400);
     }
@@ -346,7 +387,7 @@ export const updateEstimation = async (req, res) => {
       }
     }
 
-    const totals = buildTotals(normalized.items);
+    const totals = buildTotals(normalized.items, taxMode);
 
     await connection.beginTransaction();
 
@@ -356,6 +397,7 @@ export const updateEstimation = async (req, res) => {
       person: customerPerson,
       designation: customerDesignation,
       service_id: resolvedServiceId,
+      tax_mode: taxMode,
       ...totals,
       status: status ?? existing.status,
     });
@@ -366,7 +408,8 @@ export const updateEstimation = async (req, res) => {
     await connection.commit();
 
     const updated = await getEstimationByIdModel(id);
-    const response = await attachItemsAndSummary(updated);
+    const withItems = await attachItemsAndSummary(updated);
+    const response = await attachDelivery(withItems, req.body);
 
     return successResponse(res, "Estimation updated successfully", response);
   } catch (error) {
@@ -439,9 +482,20 @@ export const printEstimationById = async (req, res) => {
     const company = await getCompanySummaryModel();
     const response = await attachItemsAndSummary(estimation);
 
+    // Mark each item with hasDiscount flag; compute whether ANY item has discount
+    const itemsWithFlag = (response.items || []).map((item) => ({
+      ...item,
+      hasDiscount: toNumber(item.discountPercent, 0) > 0,
+    }));
+    const anyDiscount = itemsWithFlag.some((item) => item.hasDiscount);
+
     return successResponse(res, "Estimation fetched successfully for print", {
       company,
-      estimation: response,
+      estimation: {
+        ...response,
+        items: itemsWithFlag,
+        anyDiscount,
+      },
     });
   } catch (error) {
     console.error("printEstimationById error:", error);

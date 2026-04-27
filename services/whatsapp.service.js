@@ -46,3 +46,27 @@ export const sendQuotationWhatsapp = async ({ to, quotation, pdfUrl }) => {
 
   return { sent: true, to: normalizedTo, sid: message.sid };
 };
+
+export const sendEstimationWhatsapp = async ({ to, estimation, pdfUrl }) => {
+  const normalizedTo = normalizeWhatsappNumber(to);
+
+  if (!normalizedTo) {
+    return { sent: false, skipped: true, reason: "Customer WhatsApp number is empty" };
+  }
+
+  if (!isWhatsappConfigured()) {
+    return { sent: false, skipped: true, reason: "Twilio WhatsApp is not configured" };
+  }
+
+  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  const mediaUrl = new URL(pdfUrl, process.env.PUBLIC_BASE_URL).toString();
+
+  const message = await client.messages.create({
+    from: process.env.TWILIO_WHATSAPP_FROM,
+    to: `whatsapp:${normalizedTo}`,
+    body: `Estimation ${estimation.estimateId} is attached.`,
+    mediaUrl: [mediaUrl],
+  });
+
+  return { sent: true, to: normalizedTo, sid: message.sid };
+};

@@ -10,14 +10,13 @@ import sharp from "sharp";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
-const quotationPdfDirectory = path.join(projectRoot, "uploads", "quotations");
+const estimationPdfDirectory = path.join(projectRoot, "uploads", "estimations");
 
 const PAGE = {
   width: 595.28,
   height: 841.89,
   left: 45.35,
   right: 549.93,
-  contentWidth: 504.58,
 };
 
 const COLORS = {
@@ -27,7 +26,6 @@ const COLORS = {
   softest: "#aaaaaa",
   border: "#cccccc",
   lightBorder: "#e8e8e8",
-  lighter: "#eeeeee",
   tableHeader: "#f2f2f2",
   altRow: "#fafafa",
   white: "#ffffff",
@@ -36,24 +34,10 @@ const COLORS = {
 const STATIC_COMPANY_PROFILE = {
   name: "Infinity Byte Solution",
   address: "Abid Majeed Road, Lahore Cantt, Lahore",
-  contact: "Attn: M. Anas (IT Dept)",
 };
 
-const TERMS = [
-  "Quoted prices are valid for 30 days from the date of this quotation.",
-  "Delivery / execution schedule will be confirmed upon receipt of formal Purchase Order.",
-  "All applicable government taxes (GST, WHT) will be charged as per prevailing laws unless stated above.",
-  "Payment terms: 50% advance with PO; remaining balance before delivery / handover.",
-  "Installation, cabling, civil works, and consumables not explicitly listed are excluded.",
-  "Warranty as per respective manufacturer's standard policy unless otherwise specified.",
-  "Any change in scope of work may result in a revised quotation before execution.",
-  "This quotation supersedes all previous verbal or written communications on the same subject.",
-  "Force majeure events (natural disasters, strikes, etc.) shall not be the liability of the vendor.",
-  "All disputes, if any, shall be subject to the exclusive jurisdiction of Lahore courts.",
-];
-
 const ensureDirectory = async () => {
-  await fsPromises.mkdir(quotationPdfDirectory, { recursive: true });
+  await fsPromises.mkdir(estimationPdfDirectory, { recursive: true });
 };
 
 const v = (value, fallback = "-") => {
@@ -118,108 +102,102 @@ const toPdfImageSource = async (source) => {
   }
 };
 
-const fitImagePath = (value) => {
-  const s = String(value || "").trim();
-  if (!s) return "";
+const mm = (value) => value * 2.83464567;
+
+const resolveImagePath = (raw) => {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
   return path.join(projectRoot, s.replace(/^\/+/, ""));
 };
 
-const resolveImageUrl = (value) => {
-  const s = String(value || "").trim();
-  if (!s) return "";
+const resolveImageUrl = (raw) => {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
   if (/^https?:\/\//i.test(s)) return s;
   const base = String(process.env.PUBLIC_BASE_URL || "").trim();
-  if (!base) return "";
+  if (!base) return null;
   try {
     return new URL(s, base).toString();
   } catch {
-    return "";
+    return null;
   }
 };
 
-const normalizeItem = (item) => {
-  const rate = Number(item?.rate ?? item?.price ?? item?.salePrice ?? item?.sale_price ?? 0);
-  const qty = Number(item?.qty ?? 0);
-  const amount = Number(item?.total ?? item?.amount ?? rate * qty);
-  const gstPercent = Number(item?.gstPercent ?? item?.gst_percent ?? 0);
-  const gstAmount = Number(item?.gstAmount ?? item?.gst_amount ?? 0);
-  const rateWithGst = Number(item?.rateWithGst ?? item?.rate_with_gst ?? rate);
-  const totalWithGst = Number(item?.totalWithGst ?? item?.total_with_gst ?? amount);
+const normalizeEstimation = (input) => {
+  const isWithTax = /^withtax$/i.test(String(input?.taxMode || input?.tax_mode || "").replace(/\s+/g, ""));
+
+  const items = Array.isArray(input?.items)
+    ? input.items.map((item) => {
+        const qty = Number(item?.qty ?? 0);
+        const salePrice = Number(item?.salePrice ?? item?.sale_price ?? 0);
+        const salePriceWithTax = Number(item?.salePriceWithTax ?? item?.sale_price_with_tax ?? 0);
+        const saleTotal = Number(item?.saleTotal ?? item?.sale_total ?? salePrice * qty);
+        const saleTotalWithTax = Number(item?.saleTotalWithTax ?? item?.sale_total_with_tax ?? salePriceWithTax * qty);
+        const discountPercent = Number(item?.discountPercent ?? item?.discount_percent ?? 0);
+        const discountAmount = Number(item?.discountAmount ?? item?.discount_amount ?? 0);
+        const finalTotal = Number(item?.finalTotal ?? item?.final_total ?? 0);
+        const taxAmount = salePriceWithTax - salePrice;
+
+        return {
+          itemName: v(item?.itemName || item?.item_name),
+          description: v(item?.description, ""),
+          qty,
+          salePrice,
+          salePriceWithTax,
+          saleTotal,
+          saleTotalWithTax,
+          taxAmount,
+          discountPercent,
+          discountAmount,
+          finalTotal,
+          hasDiscount: discountPercent > 0 || discountAmount > 0,
+          itemImageRaw: item?.itemImage ?? item?.item_image ?? null,
+          itemImagePath: resolveImagePath(item?.itemImage ?? item?.item_image ?? null),
+          itemImageUrl: resolveImageUrl(item?.itemImage ?? item?.item_image ?? null),
+        };
+      })
+    : [];
+
+  const anyDiscount = input?.anyDiscount ?? items.some((item) => item.hasDiscount);
+
+  const derivedSubTotal = isWithTax
+    ? items.reduce((sum, item) => sum + item.saleTotalWithTax, 0)
+    : items.reduce((sum, item) => sum + item.saleTotal, 0);
+
+  const derivedTaxTotal = isWithTax
+    ? items.reduce((sum, item) => sum + (item.saleTotalWithTax - item.saleTotal), 0)
+    : 0;
+
+  const derivedDiscountTotal = items.reduce((sum, item) => sum + item.discountAmount, 0);
+  const derivedGrandTotal = Number(input?.summary?.finalTotal ?? input?.finalTotal ?? items.reduce((sum, item) => sum + item.finalTotal, 0));
 
   return {
-    itemName: v(item?.itemName || item?.item_name || item?.item || item?.description),
-    description: v(item?.description),
-    imageUrl: item?.imageUrl || item?.itemImage || item?.item_image || "",
-    imagePath: fitImagePath(item?.imageUrl || item?.itemImage || item?.item_image || ""),
-    imagePublicUrl: resolveImageUrl(item?.imageUrl || item?.itemImage || item?.item_image || ""),
-    rate,
-    qty,
-    amount,
-    gstPercent,
-    gstAmount,
-    rateWithGst,
-    totalWithGst,
-  };
-};
-
-const normalizeQuotation = (quotation) => {
-  const items = Array.isArray(quotation?.items) ? quotation.items.map(normalizeItem) : [];
-  const isWithTax = /^with\s*tax$/i.test(String(quotation?.taxMode || quotation?.tax_mode || "").trim());
-  const calculatedQty = items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
-  const calculatedGrandTotal = items.reduce(
-    (sum, item) => sum + Number(isWithTax ? item.totalWithGst : item.amount),
-    0
-  );
-
-  return {
-    quotationNo: v(quotation?.quotationNo || quotation?.quotation_no),
-    revisionId: v(quotation?.revisionId || quotation?.revision_id),
-    quotationDate: quotation?.quotationDate || quotation?.quotation_date || quotation?.date,
-    customerName: v(
-      quotation?.company ||
-        quotation?.customerName ||
-        quotation?.customer_name ||
-        quotation?.customer?.company
-    ),
-    person: v(quotation?.person || quotation?.customerPerson || quotation?.customer_person),
-    designation: v(
-      quotation?.designation ||
-        quotation?.customerDesignation ||
-        quotation?.customer_designation
-    ),
-    serviceName: v(
-      quotation?.forProduct ||
-        quotation?.serviceName ||
-        quotation?.service_name ||
-        quotation?.service?.serviceName
-    ),
-    department: v(
-      quotation?.department ||
-        quotation?.customerDepartment ||
-        quotation?.customer_department
-    ),
-    taxMode: v(quotation?.taxMode || quotation?.tax_mode),
+    estimateId: v(input?.estimateId || input?.estimate_id),
+    estimateDate: input?.estimateDate || input?.estimate_date,
+    customerName: v(input?.customerCompany || input?.customerName),
+    person: v(input?.person),
+    designation: v(input?.designation),
+    serviceName: v(input?.service || input?.serviceName),
+    taxMode: v(input?.taxMode || input?.tax_mode),
     items,
-    totalQty: Number(quotation?.summary?.totalQty ?? quotation?.totalQty ?? calculatedQty),
-    grandTotal: Number(quotation?.summary?.grandTotal ?? quotation?.grandTotal ?? calculatedGrandTotal),
+    anyDiscount,
+    isWithTax,
+    subTotal: Number(input?.summary?.saleTotal ?? derivedSubTotal),
+    taxTotal: Number(input?.summary?.taxTotal ?? derivedTaxTotal),
+    discountTotal: Number(input?.summary?.discountTotal ?? derivedDiscountTotal),
+    grandTotal: derivedGrandTotal,
   };
 };
-
-const isWithTaxMode = (quotation) =>
-  /^with\s*tax$/i.test(String(quotation?.taxMode || "").trim());
-
-const mm = (value) => value * 2.83464567;
-const pt = (value) => value;
 
 const drawTopAccent = (doc) => {
   doc.save();
-  doc.rect(0, 0, PAGE.width, pt(3.5)).fill(COLORS.text);
+  doc.rect(0, 0, PAGE.width, 3.5).fill(COLORS.text);
   doc.restore();
 };
 
-const drawHeader = (doc, quotation) => {
+const drawHeader = (doc, estimation) => {
   const contentX = mm(16);
-  const topY = mm(7) + pt(3.5);
+  const topY = mm(7) + 3.5;
   const rightBlockX = 392;
   const rightBlockWidth = 158;
 
@@ -254,7 +232,7 @@ const drawHeader = (doc, quotation) => {
     .font("Helvetica-Bold")
     .fontSize(6.5)
     .fillColor(COLORS.softest)
-    .text("QUOTATION", rightBlockX, topY + 2, {
+    .text("ESTIMATION", rightBlockX, topY + 2, {
       width: rightBlockWidth,
       align: "right",
       characterSpacing: 2.2,
@@ -264,7 +242,7 @@ const drawHeader = (doc, quotation) => {
     .font("Courier-Bold")
     .fontSize(13)
     .fillColor(COLORS.text)
-    .text(v(quotation.quotationNo), rightBlockX, topY + 16, {
+    .text(v(estimation.estimateId), rightBlockX, topY + 16, {
       width: rightBlockWidth,
       align: "right",
       lineBreak: false,
@@ -275,7 +253,7 @@ const drawHeader = (doc, quotation) => {
     .fontSize(8)
     .fillColor(COLORS.muted)
     .text(
-      formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }),
+      formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }),
       rightBlockX,
       topY + 33,
       {
@@ -293,7 +271,7 @@ const drawHeader = (doc, quotation) => {
     .stroke();
 };
 
-const drawSubjectAttention = (doc, quotation, startY) => {
+const drawSubjectAttention = (doc, estimation, startY) => {
   const x = mm(16);
   const totalWidth = PAGE.width - mm(32);
   const blockWidth = (totalWidth - 10) / 2;
@@ -309,7 +287,7 @@ const drawSubjectAttention = (doc, quotation, startY) => {
     .font("Helvetica-Bold")
     .fontSize(9.5)
     .fillColor(COLORS.text)
-    .text(`Quotation for ${v(quotation.serviceName)}`, x, startY + 11, {
+    .text(`Estimation for ${v(estimation.serviceName)}`, x, startY + 11, {
       width: blockWidth - 14,
     });
 
@@ -327,24 +305,25 @@ const drawSubjectAttention = (doc, quotation, startY) => {
     .fillColor(COLORS.soft)
     .text("ATTENTION", attnX, startY, { characterSpacing: 1.6 });
 
-  if (quotation.person !== "-") {
-    const line =
-      quotation.designation !== "-"
-        ? `${quotation.person} - ${quotation.designation}`
-        : quotation.person;
+  if (estimation.customerName !== "-") {
     doc
-      .font("Helvetica")
+      .font("Helvetica-Bold")
       .fontSize(8.5)
       .fillColor(COLORS.text)
-      .text(line, attnX, startY + 11, { width: blockWidth - 10 });
+      .text(estimation.customerName, attnX, startY + 11, { width: blockWidth - 10 });
   }
 
-  if (quotation.department !== "-") {
+  if (estimation.person !== "-") {
+    const line =
+      estimation.designation !== "-"
+        ? `${estimation.person} — ${estimation.designation}`
+        : estimation.person;
+
     doc
       .font("Helvetica")
       .fontSize(8)
       .fillColor(COLORS.muted)
-      .text(quotation.department, attnX, startY + 24, { width: blockWidth - 10 });
+      .text(line, attnX, startY + 24, { width: blockWidth - 10 });
   }
 
   return startY + 50;
@@ -352,6 +331,7 @@ const drawSubjectAttention = (doc, quotation, startY) => {
 
 const drawSectionHeader = (doc, label, y) => {
   const x = mm(16);
+
   doc
     .font("Helvetica-Bold")
     .fontSize(6.5)
@@ -367,8 +347,8 @@ const drawSectionHeader = (doc, label, y) => {
     .stroke();
 };
 
-const drawItemDescriptionCell = (doc, item, x, y, width) => {
-  const paddingX = 6;
+const drawDescriptionCell = (doc, item, x, y, width) => {
+  const paddingX = 5;
   const paddingY = 7;
   const imageSize = 28;
   const imageGap = 5;
@@ -393,13 +373,13 @@ const drawItemDescriptionCell = (doc, item, x, y, width) => {
     .font("Helvetica-Bold")
     .fontSize(8.5)
     .fillColor(COLORS.text)
-    .text(v(item.itemName), textX, y + paddingY, {
+    .text(item.itemName, textX, y + paddingY, {
       width: textWidth,
       lineGap: 0,
     });
 
-  if (v(item.description) !== "-") {
-    const nameHeight = doc.heightOfString(v(item.itemName), {
+  if (item.description && item.description !== "-") {
+    const nameHeight = doc.heightOfString(item.itemName, {
       width: textWidth,
       lineGap: 0,
     });
@@ -408,61 +388,57 @@ const drawItemDescriptionCell = (doc, item, x, y, width) => {
       .font("Helvetica")
       .fontSize(7.5)
       .fillColor("#666666")
-      .text(v(item.description), textX, y + paddingY + nameHeight + 2, {
+      .text(item.description, textX, y + paddingY + nameHeight + 2, {
         width: textWidth,
         lineGap: 0,
       });
   }
 };
 
-const getItemDescriptionHeight = (doc, item, width) => {
-  const paddingX = 6;
+const getDescriptionHeight = (doc, item, width) => {
+  const paddingX = 5;
   const imageSize = 28;
   const imageGap = 5;
   const hasImage = Boolean(item.imageSource);
   const textWidth = width - paddingX * 2 - (hasImage ? imageSize + imageGap : 0);
 
-  const nameHeight = doc.heightOfString(v(item.itemName), {
+  const nameHeight = doc.heightOfString(item.itemName, {
     width: textWidth,
     lineGap: 0,
   });
 
   const descriptionHeight =
-    v(item.description) !== "-"
-      ? doc.heightOfString(v(item.description), {
+    item.description && item.description !== "-"
+      ? doc.heightOfString(item.description, {
           width: textWidth,
           lineGap: 0,
         })
       : 0;
 
   const textHeight = nameHeight + (descriptionHeight ? descriptionHeight + 2 : 0);
-  return Math.max(26, textHeight + 14, hasImage ? imageSize + 14 : 0);
+  return Math.max(36, textHeight + 14, hasImage ? imageSize + 14 : 0);
 };
 
-const drawItemsTable = (doc, quotation, y) => {
-  const isWithTax = isWithTaxMode(quotation);
+const drawItemsTable = (doc, estimation, y) => {
+  const { anyDiscount, isWithTax, items } = estimation;
   const x = mm(16);
   const tableWidth = PAGE.width - mm(32);
-  const headerHeight = 24;
-  const rowMinHeight = 26;
+  const headerHeight = 28;
 
-  const columns = isWithTax
-    ? [
-        { key: "sr", label: "#", width: 22.7, align: "center" },
-        { key: "description", label: "Description", width: 165, align: "left" },
-        { key: "rate", label: "Unit Rate", width: 73.7, align: "right" },
-        { key: "qty", label: "Qty", width: 36.9, align: "right" },
-        { key: "gstAmount", label: "GST Amt", width: 62.4, align: "right" },
-        { key: "rateWithGst", label: "Rate + GST", width: 73.7, align: "right" },
-        { key: "totalWithGst", label: "Total", width: 70.18, align: "right" },
-      ]
-    : [
-        { key: "sr", label: "#", width: 22.7, align: "center" },
-        { key: "description", label: "Description", width: 279, align: "left" },
-        { key: "rate", label: "Unit Rate", width: 73.7, align: "right" },
-        { key: "qty", label: "Qty", width: 36.9, align: "right" },
-        { key: "amount", label: "Total", width: 92.28, align: "right" },
-      ];
+  const itemColWidth = anyDiscount ? 160 : 190;
+
+  const columns = [
+    { key: "sr", label: "#", width: 22, align: "center" },
+    { key: "item", label: "Item /\nDescription", width: itemColWidth, align: "left" },
+    { key: "qty", label: "Qty", width: 35, align: "right" },
+    { key: "salePrice", label: isWithTax ? "Unit Price (w/ Tax)" : "Unit Price", width: 85, align: "right" },
+    ...(isWithTax ? [{ key: "taxAmt", label: "Tax Amt", width: 55, align: "right" }] : []),
+    ...(anyDiscount ? [{ key: "discAmt", label: "Disc Amt", width: 60, align: "right" }] : []),
+    { key: "total", label: "Final Total", width: 0, align: "right" },
+  ];
+
+  const fixedWidth = columns.slice(0, -1).reduce((sum, col) => sum + col.width, 0);
+  columns[columns.length - 1].width = tableWidth - fixedWidth;
 
   doc.rect(x, y, tableWidth, headerHeight).fill(COLORS.tableHeader);
   doc.rect(x, y, tableWidth, headerHeight).lineWidth(0.75).strokeColor(COLORS.border).stroke();
@@ -478,15 +454,18 @@ const drawItemsTable = (doc, quotation, y) => {
         .stroke();
     }
 
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(6.8)
-      .fillColor(COLORS.text)
-      .text(col.label.toUpperCase(), currentX + 6, y + 8, {
-        width: col.width - 12,
-        align: col.align,
-        characterSpacing: 0.8,
-      });
+    const lines = String(col.label).split("\n");
+    lines.forEach((line, lineIndex) => {
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(6.8)
+        .fillColor(COLORS.text)
+        .text(line.toUpperCase(), currentX + 5, y + 8 + lineIndex * 9, {
+          width: col.width - 10,
+          align: col.align,
+          characterSpacing: 0.8,
+        });
+    });
 
     currentX += col.width;
   });
@@ -499,23 +478,23 @@ const drawItemsTable = (doc, quotation, y) => {
     .stroke();
 
   let rowY = y + headerHeight;
-  const items = quotation.items || [];
 
   if (!items.length) {
-    doc.rect(x, rowY, tableWidth, rowMinHeight).lineWidth(0.5).strokeColor(COLORS.lightBorder).stroke();
+    doc.rect(x, rowY, tableWidth, 36).lineWidth(0.5).strokeColor(COLORS.lightBorder).stroke();
     doc
       .font("Helvetica")
       .fontSize(8)
       .fillColor("#999999")
-      .text("No line items found.", x, rowY + 9, {
+      .text("No line items found.", x, rowY + 10, {
         width: tableWidth,
         align: "center",
       });
-    return rowY + rowMinHeight;
+    return rowY + 36;
   }
 
   items.forEach((item, index) => {
-    const rowHeight = Math.max(rowMinHeight, getItemDescriptionHeight(doc, item, columns[1].width));
+    const itemColumn = columns.find((col) => col.key === "item");
+    const rowHeight = getDescriptionHeight(doc, item, itemColumn.width);
 
     if (index % 2 === 1) {
       doc.rect(x, rowY, tableWidth, rowHeight).fill(COLORS.altRow);
@@ -534,24 +513,44 @@ const drawItemsTable = (doc, quotation, y) => {
           .stroke();
       }
 
-      if (col.key === "description") {
-        drawItemDescriptionCell(doc, item, currentX, rowY, col.width);
+      if (col.key === "item") {
+        drawDescriptionCell(doc, item, currentX, rowY, col.width);
       } else {
         let value = "";
-        if (col.key === "sr") value = String(index + 1);
-        if (col.key === "rate") value = formatMoney(item.rate);
-        if (col.key === "qty") value = formatMoney(item.qty);
-        if (col.key === "gstAmount") value = formatMoney(item.gstAmount);
-        if (col.key === "rateWithGst") value = formatMoney(item.rateWithGst);
-        if (col.key === "totalWithGst") value = formatMoney(item.totalWithGst);
-        if (col.key === "amount") value = formatMoney(item.amount);
+        let font = "Courier";
+        let fontSize = 8.2;
+        let color = COLORS.text;
+
+        switch (col.key) {
+          case "sr":
+            value = String(index + 1);
+            font = "Helvetica";
+            fontSize = 8;
+            color = "#999999";
+            break;
+          case "qty":
+            value = formatMoney(item.qty);
+            break;
+          case "salePrice":
+            value = isWithTax ? formatMoney(item.salePriceWithTax) : formatMoney(item.salePrice);
+            break;
+          case "taxAmt":
+            value = formatMoney(item.taxAmount);
+            break;
+          case "discAmt":
+            value = item.hasDiscount ? formatMoney(item.discountAmount) : "0.00";
+            break;
+          case "total":
+            value = formatMoney(item.finalTotal);
+            break;
+        }
 
         doc
-          .font(col.key === "sr" ? "Helvetica" : "Courier")
-          .fontSize(col.key === "sr" ? 8 : 8.2)
-          .fillColor(col.key === "sr" ? "#999999" : COLORS.text)
-          .text(value, currentX + 6, rowY + 7, {
-            width: col.width - 12,
+          .font(font)
+          .fontSize(fontSize)
+          .fillColor(color)
+          .text(value, currentX + 5, rowY + (rowHeight - fontSize) / 2, {
+            width: col.width - 10,
             align: col.align,
             lineBreak: false,
             ellipsis: true,
@@ -567,36 +566,29 @@ const drawItemsTable = (doc, quotation, y) => {
   return rowY;
 };
 
-const drawTotals = (doc, quotation, startY) => {
-  const isWithTax = isWithTaxMode(quotation);
+const drawTotals = (doc, estimation, startY) => {
+  const { anyDiscount, isWithTax, subTotal, taxTotal, discountTotal, grandTotal } = estimation;
   const boxWidth = mm(72);
   const tableRightX = mm(16) + (PAGE.width - mm(32));
   const boxX = tableRightX - boxWidth;
   const rowHeight = 20;
   let y = startY + 8;
 
-  const rows = [];
-  if (isWithTax) {
-    rows.push([
-      "Sub-Total (PKR)",
-      formatMoney(quotation.items.reduce((s, i) => s + Number(i.amount || 0), 0)),
-      false,
-    ]);
-    rows.push([
-      "GST Amount (PKR)",
-      formatMoney(quotation.items.reduce((s, i) => s + Number(i.gstAmount || 0), 0)),
-      false,
-    ]);
-  }
-  rows.push(["Grand Total (PKR)", formatMoney(quotation.grandTotal), true]);
+  const rows = [
+    ["Sub Total (PKR)", formatMoney(subTotal), false],
+    ...(isWithTax ? [["Tax Total (PKR)", formatMoney(taxTotal), false]] : []),
+    ...(anyDiscount ? [["Total Discount (PKR)", formatMoney(discountTotal), false]] : []),
+    ["Grand Total (PKR)", formatMoney(grandTotal), true],
+  ];
 
   const totalHeight = rows.reduce((sum, row) => sum + (row[2] ? 24 : rowHeight), 0);
   doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(0.75).strokeColor(COLORS.border).stroke();
 
   rows.forEach(([label, value, grand], index) => {
-    const h = grand ? 24 : rowHeight;
+    const height = grand ? 24 : rowHeight;
+
     if (grand) {
-      doc.rect(boxX, y, boxWidth, h).fill(COLORS.tableHeader);
+      doc.rect(boxX, y, boxWidth, height).fill(COLORS.tableHeader);
       doc
         .moveTo(boxX, y)
         .lineTo(boxX + boxWidth, y)
@@ -630,49 +622,14 @@ const drawTotals = (doc, quotation, startY) => {
         align: "right",
       });
 
-    y += h;
+    y += height;
   });
 
   return startY + 8 + totalHeight;
 };
 
-const drawTerms = (doc, startY) => {
-  drawSectionHeader(doc, "Terms & Conditions", startY);
-
-  const x = mm(16);
-  const width = PAGE.width - mm(32);
-  let y = startY + 16;
-  const bulletX = x + 4;
-  const textX = x + 16;
-  const textWidth = width - (textX - x);
-  const fontSize = 7.8;
-  const bulletRadius = 2.1;
-
-  TERMS.forEach((term) => {
-    doc.circle(bulletX, y + 4.8, bulletRadius).lineWidth(1.4).strokeColor(COLORS.text).stroke();
-
-    doc
-      .font("Helvetica")
-      .fontSize(fontSize)
-      .fillColor("#444444")
-      .text(term, textX, y, {
-        width: textWidth,
-        lineGap: 0,
-      });
-
-    const textHeight = doc.heightOfString(term, {
-      width: textWidth,
-      lineGap: 0,
-    });
-
-    y += Math.max(fontSize + 3, textHeight + 2);
-  });
-
-  return y;
-};
-
 const drawFooter = (doc, endY) => {
-  const y = Math.min(endY + 10, 774);
+  const y = Math.min(endY + 12, 774);
   const x = mm(16);
   const signWidth = mm(55);
   const signX = PAGE.right - mm(16) - signWidth;
@@ -682,7 +639,7 @@ const drawFooter = (doc, endY) => {
     .fontSize(7.5)
     .fillColor(COLORS.soft)
     .text(
-      "We trust this offer meets your requirements. For clarifications, please feel free to contact us.\nThank you for considering Infinity Byte Solution.",
+      "This estimation is prepared for review purposes only and is subject to change.\nThank you for considering Infinity Byte Solution.",
       x,
       y,
       {
@@ -719,28 +676,28 @@ const drawFooter = (doc, endY) => {
     });
 };
 
-export const generateQuotationPdf = async (quotationInput) => {
+export const generateEstimationPdf = async (estimationInput) => {
   await ensureDirectory();
 
-  const quotation = normalizeQuotation(quotationInput);
+  const estimation = normalizeEstimation(estimationInput);
 
   await Promise.all(
-    quotation.items.map(async (item) => {
-      if (item.imagePath && fs.existsSync(item.imagePath)) {
-        item.imageSource = await toPdfImageSource(item.imagePath);
+    estimation.items.map(async (item) => {
+      if (item.itemImagePath && fs.existsSync(item.itemImagePath)) {
+        item.imageSource = await toPdfImageSource(item.itemImagePath);
         return;
       }
-      if (item.imagePublicUrl) {
-        item.imageSource = await toPdfImageSource(await fetchImageBuffer(item.imagePublicUrl));
+      if (item.itemImageUrl) {
+        item.imageSource = await toPdfImageSource(await fetchImageBuffer(item.itemImageUrl));
         return;
       }
       item.imageSource = null;
     })
   );
 
-  const safeQuotationNo = String(quotation.quotationNo || quotationInput?.id || "quotation").replace(/[^\w-]/g, "-");
-  const fileName = `${safeQuotationNo}-${Date.now()}.pdf`;
-  const filePath = path.join(quotationPdfDirectory, fileName);
+  const safeId = String(estimation.estimateId || estimationInput?.id || "estimation").replace(/[^\w-]/g, "-");
+  const fileName = `${safeId}-${Date.now()}.pdf`;
+  const filePath = path.join(estimationPdfDirectory, fileName);
 
   const doc = new PDFDocument({ size: "A4", margin: 0 });
   const stream = fs.createWriteStream(filePath);
@@ -748,13 +705,14 @@ export const generateQuotationPdf = async (quotationInput) => {
 
   doc.rect(0, 0, PAGE.width, PAGE.height).fill(COLORS.white);
   drawTopAccent(doc);
-  drawHeader(doc, quotation);
-  const afterSubjectY = drawSubjectAttention(doc, quotation, 110);
-  drawSectionHeader(doc, "Commercial Offer", afterSubjectY + 4);
-  const tableEndY = drawItemsTable(doc, quotation, afterSubjectY + 20);
-  const totalsEndY = drawTotals(doc, quotation, tableEndY);
-  const termsEndY = drawTerms(doc, totalsEndY + 12);
-  drawFooter(doc, termsEndY + 4);
+  drawHeader(doc, estimation);
+
+  const afterSubjectY = drawSubjectAttention(doc, estimation, 110);
+  drawSectionHeader(doc, "Items", afterSubjectY + 4);
+
+  const tableEndY = drawItemsTable(doc, estimation, afterSubjectY + 20);
+  const totalsEndY = drawTotals(doc, estimation, tableEndY);
+  drawFooter(doc, totalsEndY + 4);
 
   doc.end();
 
@@ -763,6 +721,6 @@ export const generateQuotationPdf = async (quotationInput) => {
     stream.on("error", reject);
   });
 
-  const publicUrl = `/uploads/quotations/${fileName}`;
+  const publicUrl = `/uploads/estimations/${fileName}`;
   return { filePath, fileName, publicUrl };
 };

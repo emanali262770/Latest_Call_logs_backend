@@ -27,12 +27,15 @@ const estimationSelectClause = `
     e.customer_id          AS customerId,
     c.company              AS customerCompany,
     c.company              AS customerName,
+    c.email                AS customerEmail,
+    c.whatsapp_no          AS customerWhatsappNo,
     e.person,
     e.designation,
     c.department,
     e.service_id           AS serviceId,
     s.service_name         AS service,
     s.service_name         AS serviceName,
+    e.tax_mode             AS taxMode,
     e.created_by           AS createdById,
     u.username             AS createdBy,
     e.grand_purchase_total AS purchaseTotal,
@@ -56,6 +59,7 @@ export const createEstimationHeaderModel = async (connection, fields) => {
     person,
     designation,
     service_id,
+    tax_mode,
     created_by,
     grand_purchase_total,
     grand_sale_total,
@@ -67,9 +71,9 @@ export const createEstimationHeaderModel = async (connection, fields) => {
   const [result] = await connection.execute(
     `INSERT INTO estimations (
       estimate_id, estimate_date, customer_id, person, designation,
-      service_id, created_by, grand_purchase_total, grand_sale_total,
+      service_id, tax_mode, created_by, grand_purchase_total, grand_sale_total,
       grand_discount_total, grand_final_total, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       estimate_id,
       estimate_date,
@@ -77,6 +81,7 @@ export const createEstimationHeaderModel = async (connection, fields) => {
       person ?? null,
       designation ?? null,
       service_id ?? null,
+      tax_mode ?? "withoutTax",
       created_by ?? null,
       grand_purchase_total ?? 0,
       grand_sale_total ?? 0,
@@ -96,6 +101,7 @@ export const updateEstimationHeaderModel = async (connection, id, fields) => {
     person,
     designation,
     service_id,
+    tax_mode,
     grand_purchase_total,
     grand_sale_total,
     grand_discount_total,
@@ -110,6 +116,7 @@ export const updateEstimationHeaderModel = async (connection, id, fields) => {
       person = ?,
       designation = ?,
       service_id = ?,
+      tax_mode = ?,
       grand_purchase_total = ?,
       grand_sale_total = ?,
       grand_discount_total = ?,
@@ -122,6 +129,7 @@ export const updateEstimationHeaderModel = async (connection, id, fields) => {
       person ?? null,
       designation ?? null,
       service_id ?? null,
+      tax_mode ?? "withoutTax",
       grand_purchase_total ?? 0,
       grand_sale_total ?? 0,
       grand_discount_total ?? 0,
@@ -195,9 +203,12 @@ export const getEstimationItemsByEstimationIdModel = async (estimationId) => {
       ei.discount_amount    AS discountAmount,
       ei.final_price        AS finalPrice,
       ei.final_total        AS finalTotal,
+      id_def.image          AS itemImage,
       ei.created_at         AS createdAt,
       ei.updated_at         AS updatedAt
     FROM estimation_items ei
+    LEFT JOIN item_rates ir       ON ei.item_rate_id = ir.id
+    LEFT JOIN item_definitions id_def ON ir.item_definition_id = id_def.id
     WHERE ei.estimation_id = ?
     ORDER BY ei.id ASC
     `,
