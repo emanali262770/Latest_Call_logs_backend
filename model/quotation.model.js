@@ -266,23 +266,27 @@ export const getQuotationItemsByQuotationIdModel = async (quotationId) => {
   const [rows] = await db.execute(
     `
     SELECT
-      id,
-      quotation_id    AS quotationId,
-      item_rate_id    AS itemRateId,
-      item_name       AS itemName,
-      rate,
-      qty,
-      description,
-      total,
-      gst_percent     AS gstPercent,
-      gst_amount      AS gstAmount,
-      rate_with_gst   AS rateWithGst,
-      total_with_gst  AS totalWithGst,
-      created_at      AS createdAt,
-      updated_at      AS updatedAt
-    FROM quotation_items
-    WHERE quotation_id = ?
-    ORDER BY id ASC
+      qi.id,
+      qi.quotation_id    AS quotationId,
+      qi.item_rate_id    AS itemRateId,
+      idf.image          AS image,
+      idf.image          AS itemImage,
+      qi.item_name       AS itemName,
+      qi.rate,
+      qi.qty,
+      qi.description,
+      qi.total,
+      qi.gst_percent     AS gstPercent,
+      qi.gst_amount      AS gstAmount,
+      qi.rate_with_gst   AS rateWithGst,
+      qi.total_with_gst  AS totalWithGst,
+      qi.created_at      AS createdAt,
+      qi.updated_at      AS updatedAt
+    FROM quotation_items qi
+    LEFT JOIN item_rates ir ON qi.item_rate_id = ir.id
+    LEFT JOIN item_definitions idf ON ir.item_definition_id = idf.id
+    WHERE qi.quotation_id = ?
+    ORDER BY qi.id ASC
     `,
     [quotationId]
   );

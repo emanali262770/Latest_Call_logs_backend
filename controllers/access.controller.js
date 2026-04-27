@@ -11,7 +11,7 @@ export const assignPermissionToGroup = async (req, res) => {
     const { group_id, permission_id, permission_ids } = req.body;
     const normalizedPermissionIds = permission_ids ?? permission_id;
 
-    if (!group_id || !normalizedPermissionIds) {
+    if (!group_id || normalizedPermissionIds === undefined || normalizedPermissionIds === null) {
       return errorResponse(
         res,
         "group_id and permission_id or permission_ids are required",
@@ -23,19 +23,11 @@ export const assignPermissionToGroup = async (req, res) => {
       ? normalizedPermissionIds
       : [normalizedPermissionIds];
 
-    if (ids.length === 0) {
-      return errorResponse(
-        res,
-        "permission_id or permission_ids must contain at least one value",
-        400
-      );
-    }
-
     const result = await assignPermissionToGroupModel(group_id, ids);
 
     return successResponse(
       res,
-      `${result.assigned} permission(s) assigned to group successfully`,
+      `Group permissions updated successfully`,
       {
         group_id,
         permission_ids: ids,
