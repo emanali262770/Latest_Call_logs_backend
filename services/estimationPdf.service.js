@@ -357,11 +357,25 @@ const drawSectionHeader = (doc, label, y) => {
     .stroke();
 };
 
-const drawDescriptionCell = (doc, item, x, y, width) => {
-  const paddingX = 4;
-  const paddingY = 4;
-  const imageSize = 18;
-  const imageGap = 4;
+// compact levels: 0 = normal, 1 = compact (24-40 items), 2 = ultra (>40 items)
+const getCompactLevel = (itemCount) => {
+  if (itemCount > 40) return 2;
+  if (itemCount > 23) return 1;
+  return 0;
+};
+
+const COMPACT_PARAMS = [
+  // level 0: normal (≤23 items) — matches HTML CSS exactly (padding:1.4pt 3pt, name:7pt, desc:6pt, img:18pt)
+  { paddingX: 3, paddingY: 1.4, imageSize: 18, imageGap: 2, nameFontSize: 7.0, descFontSize: 6.0, minRowHeight: 18, showDesc: true },
+  // level 1: compact (24-40 items)
+  { paddingX: 2.5, paddingY: 1.2, imageSize: 14, imageGap: 2, nameFontSize: 6.0, descFontSize: 5.0, minRowHeight: 13, showDesc: true },
+  // level 2: ultra (>40 items) — fits 50 items on one page
+  { paddingX: 2, paddingY: 1.0, imageSize: 0, imageGap: 0, nameFontSize: 5.2, descFontSize: 4.4, minRowHeight: 9, showDesc: true },
+];
+
+const drawDescriptionCell = (doc, item, x, y, width, compactLevel = 0) => {
+  const cp = COMPACT_PARAMS[compactLevel];
+  const { paddingX, paddingY, imageSize, imageGap, nameFontSize, descFontSize } = cp;
   const hasImage = Boolean(item.imageSource);
 
   let textX = x + paddingX;
@@ -381,14 +395,14 @@ const drawDescriptionCell = (doc, item, x, y, width) => {
 
   doc
     .font("Helvetica-Bold")
-    .fontSize(6.8)
+    .fontSize(nameFontSize)
     .fillColor(COLORS.text)
     .text(item.itemName, textX, y + paddingY, {
       width: textWidth,
       lineGap: -1,
     });
 
-  if (item.description && item.description !== "-") {
+  if (cp.showDesc && item.description && item.description !== "-") {
     const nameHeight = doc.heightOfString(item.itemName, {
       width: textWidth,
       lineGap: -1,
@@ -396,7 +410,7 @@ const drawDescriptionCell = (doc, item, x, y, width) => {
 
     doc
       .font("Helvetica")
-      .fontSize(5.8)
+      .fontSize(descFontSize)
       .fillColor("#666666")
       .text(item.description, textX, y + paddingY + nameHeight, {
         width: textWidth,
@@ -405,48 +419,103 @@ const drawDescriptionCell = (doc, item, x, y, width) => {
   }
 };
 
-const getDescriptionHeight = (doc, item, width) => {
-  const paddingX = 4;
-  const imageSize = 18;
-  const imageGap = 4;
+const getDescriptionHeight = (doc, item, width, compactLevel = 0) => {
+  const cp = COMPACT_PARAMS[compactLevel];
+  const { paddingX, imageSize, imageGap, nameFontSize, descFontSize, minRowHeight } = cp;
   const hasImage = Boolean(item.imageSource);
   const textWidth = width - paddingX * 2 - (hasImage ? imageSize + imageGap : 0);
 
-  doc.font("Helvetica-Bold").fontSize(6.8);
+  doc.font("Helvetica-Bold").fontSize(nameFontSize);
   const nameHeight = doc.heightOfString(item.itemName, {
     width: textWidth,
     lineGap: -1,
   });
 
-  doc.font("Helvetica").fontSize(5.8);
-  const descriptionHeight =
-    item.description && item.description !== "-"
-      ? doc.heightOfString(item.description, {
-          width: textWidth,
-          lineGap: -1,
-        })
-      : 0;
+  let descriptionHeight = 0;
+  if (cp.showDesc && item.description && item.description !== "-") {
+    doc.font("Helvetica").fontSize(descFontSize);
+    descriptionHeight = doc.heightOfString(item.description, {
+      width: textWidth,
+      lineGap: -1,
+    });
+  }
 
   const textHeight = nameHeight + descriptionHeight;
-  return Math.max(22, textHeight + 8, hasImage ? imageSize + 8 : 0);
+  return Math.max(minRowHeight, textHeight + cp.paddingY * 2, hasImage ? imageSize + cp.paddingY * 2 : 0);
+};
+
+// Per-template table color schemes
+const TABLE_STYLES = {
+  default: {
+    headerFill: COLORS.tableHeader,
+    headerStroke: COLORS.border,
+    headerText: COLORS.text,
+    headerDivider: "#dddddd",
+    bodyStroke: COLORS.lightBorder,
+    altRowFill: COLORS.altRow,
+    bottomHeaderLine: COLORS.text,
+    bottomHeaderLineWidth: 1.5,
+  },
+  technical_bid: {
+    headerFill: "#f6f8fb",
+    headerStroke: "#b9c3d1",
+    headerText: "#111827",
+    headerDivider: "#d9e1ec",
+    bodyStroke: "#dfe5ee",
+    altRowFill: "#fbfcfe",
+    bottomHeaderLine: "#111827",
+    bottomHeaderLineWidth: 1.15,
+  },
+  modern_clean: {
+    headerFill: "#1264a3",
+    headerStroke: "#0d4f82",
+    headerText: "#ffffff",
+    headerDivider: "#1a7abf",
+    bodyStroke: "#d0e8f7",
+    altRowFill: "#f0f7ff",
+    bottomHeaderLine: "#0d4f82",
+    bottomHeaderLineWidth: 1.5,
+  },
+  premium_tax: {
+    headerFill: "#0f3d2e",
+    headerStroke: "#c9a24d",
+    headerText: "#f5e6bc",
+    headerDivider: "#1a5c44",
+    bodyStroke: "#d6c89a",
+    altRowFill: "#fdfaf3",
+    bottomHeaderLine: "#c9a24d",
+    bottomHeaderLineWidth: 1.5,
+  },
+  compact_commercial: {
+    headerFill: "#111827",
+    headerStroke: "#374151",
+    headerText: "#f9fafb",
+    headerDivider: "#374151",
+    bodyStroke: "#e5e7eb",
+    altRowFill: "#f9fafb",
+    bottomHeaderLine: "#374151",
+    bottomHeaderLineWidth: 1.2,
+  },
 };
 
 const drawItemsTable = (doc, estimation, y) => {
   const { anyDiscount, isWithTax, items } = estimation;
-  const isTechnical = estimation.printTemplate === "technical_bid";
+  const template = estimation.printTemplate || "default";
+  const style = TABLE_STYLES[template] || TABLE_STYLES.default;
+  const compactLevel = getCompactLevel(items.length);
   const x = mm(16);
   const tableWidth = PAGE.width - mm(32);
-  const headerHeight = 20;
-  const headerFill = isTechnical ? "#f6f8fb" : COLORS.tableHeader;
-  const headerStroke = isTechnical ? "#b9c3d1" : COLORS.border;
-  const bodyStroke = isTechnical ? "#dfe5ee" : COLORS.lightBorder;
-  const headerText = isTechnical ? "#111827" : COLORS.text;
+  const headerHeight = compactLevel === 2 ? 13 : compactLevel === 1 ? 16 : 22;
+  const headerFill = style.headerFill;
+  const headerStroke = style.headerStroke;
+  const bodyStroke = style.bodyStroke;
+  const headerText = style.headerText;
 
   const itemColWidth = anyDiscount ? 172 : 210;
 
   const columns = [
     { key: "sr", label: "#", width: 22, align: "center" },
-    { key: "item", label: "Item /\nDescription", width: itemColWidth, align: "left" },
+    { key: "item", label: "Item / Description", width: itemColWidth, align: "left" },
     { key: "qty", label: "Qty", width: 35, align: "right" },
     { key: "salePrice", label: isWithTax ? "Unit Price (w/ Tax)" : "Unit Price", width: 85, align: "right" },
     ...(isWithTax ? [{ key: "taxAmt", label: "Tax Amt", width: 55, align: "right" }] : []),
@@ -458,7 +527,7 @@ const drawItemsTable = (doc, estimation, y) => {
   columns[columns.length - 1].width = tableWidth - fixedWidth;
 
   doc.rect(x, y, tableWidth, headerHeight).fill(headerFill);
-  doc.rect(x, y, tableWidth, headerHeight).lineWidth(isTechnical ? 0.9 : 0.75).strokeColor(headerStroke).stroke();
+  doc.rect(x, y, tableWidth, headerHeight).lineWidth(template === "technical_bid" ? 0.9 : 0.75).strokeColor(headerStroke).stroke();
 
   let currentX = x;
   columns.forEach((col, index) => {
@@ -467,17 +536,20 @@ const drawItemsTable = (doc, estimation, y) => {
         .moveTo(currentX, y)
         .lineTo(currentX, y + headerHeight)
         .lineWidth(0.75)
-        .strokeColor(isTechnical ? "#d9e1ec" : "#dddddd")
+        .strokeColor(style.headerDivider)
         .stroke();
     }
 
+    const headerFontSize = compactLevel === 2 ? 4.2 : compactLevel === 1 ? 5.6 : 6.5;
+    const headerTopPad = compactLevel === 2 ? 3 : compactLevel === 1 ? 5 : 8;
+    const headerLineGap = compactLevel === 2 ? 4 : compactLevel === 1 ? 6 : 7;
     const lines = String(col.label).split("\n");
     lines.forEach((line, lineIndex) => {
       doc
         .font("Helvetica-Bold")
-        .fontSize(5.6)
+        .fontSize(headerFontSize)
         .fillColor(headerText)
-        .text(line.toUpperCase(), currentX + 4, y + 5 + lineIndex * 7, {
+        .text(line.toUpperCase(), currentX + 4, headerTopPad + y + lineIndex * headerLineGap, {
           width: col.width - 10,
           align: col.align,
           characterSpacing: 0.5,
@@ -490,11 +562,12 @@ const drawItemsTable = (doc, estimation, y) => {
   doc
     .moveTo(x, y + headerHeight)
     .lineTo(x + tableWidth, y + headerHeight)
-    .lineWidth(isTechnical ? 1.15 : 1.5)
-    .strokeColor(isTechnical ? "#111827" : COLORS.text)
+    .lineWidth(style.bottomHeaderLineWidth)
+    .strokeColor(style.bottomHeaderLine)
     .stroke();
 
-  let rowY = y + headerHeight;
+  // Start rows 1pt below header bottom line to prevent border collision
+  let rowY = y + headerHeight + 1;
 
   if (!items.length) {
     doc.rect(x, rowY, tableWidth, 22).lineWidth(0.5).strokeColor(bodyStroke).stroke();
@@ -511,10 +584,10 @@ const drawItemsTable = (doc, estimation, y) => {
 
   items.forEach((item, index) => {
     const itemColumn = columns.find((col) => col.key === "item");
-    const rowHeight = getDescriptionHeight(doc, item, itemColumn.width);
+    const rowHeight = getDescriptionHeight(doc, item, itemColumn.width, compactLevel);
 
     if (index % 2 === 1) {
-      doc.rect(x, rowY, tableWidth, rowHeight).fill(isTechnical ? "#fbfcfe" : COLORS.altRow);
+      doc.rect(x, rowY, tableWidth, rowHeight).fill(style.altRowFill);
     }
 
     doc.rect(x, rowY, tableWidth, rowHeight).lineWidth(0.5).strokeColor(bodyStroke).stroke();
@@ -531,7 +604,7 @@ const drawItemsTable = (doc, estimation, y) => {
       }
 
       if (col.key === "item") {
-        drawDescriptionCell(doc, item, currentX, rowY, col.width);
+        drawDescriptionCell(doc, item, currentX, rowY, col.width, compactLevel);
       } else {
         let value = "";
         let font = "Courier";
@@ -542,23 +615,28 @@ const drawItemsTable = (doc, estimation, y) => {
           case "sr":
             value = String(index + 1);
             font = "Helvetica";
-            fontSize = 6;
+            fontSize = compactLevel === 2 ? 4.5 : compactLevel === 1 ? 5.5 : 6.4;
             color = "#999999";
             break;
           case "qty":
             value = formatMoney(item.qty);
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
           case "salePrice":
             value = isWithTax ? formatMoney(item.salePriceWithTax) : formatMoney(item.salePrice);
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
           case "taxAmt":
             value = formatMoney(item.taxAmount);
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
           case "discAmt":
             value = item.hasDiscount ? formatMoney(item.discountAmount) : "0.00";
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
           case "total":
             value = formatMoney(item.finalTotal);
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
         }
 
@@ -566,7 +644,7 @@ const drawItemsTable = (doc, estimation, y) => {
           .font(font)
           .fontSize(fontSize)
           .fillColor(color)
-          .text(value, currentX + 4, rowY + Math.max(3, (rowHeight - fontSize) / 2), {
+          .text(value, currentX + 4, rowY + Math.max(2, (rowHeight - fontSize) / 2), {
             width: col.width - 10,
             align: col.align,
             lineBreak: false,
@@ -585,7 +663,8 @@ const drawItemsTable = (doc, estimation, y) => {
 
 const drawTotals = (doc, estimation, startY) => {
   const { anyDiscount, isWithTax, subTotal, taxTotal, discountTotal, grandTotal } = estimation;
-  const isTechnical = estimation.printTemplate === "technical_bid";
+  const template = estimation.printTemplate || "default";
+  const style = TABLE_STYLES[template] || TABLE_STYLES.default;
   const boxWidth = mm(72);
   const tableRightX = mm(16) + (PAGE.width - mm(32));
   const boxX = tableRightX - boxWidth;
@@ -600,18 +679,18 @@ const drawTotals = (doc, estimation, startY) => {
   ];
 
   const totalHeight = rows.reduce((sum, row) => sum + (row[2] ? 17 : rowHeight), 0);
-  doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(isTechnical ? 0.9 : 0.75).strokeColor(isTechnical ? "#b9c3d1" : COLORS.border).stroke();
+  doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(0.75).strokeColor(style.headerStroke).stroke();
 
   rows.forEach(([label, value, grand], index) => {
     const height = grand ? 17 : rowHeight;
 
     if (grand) {
-      doc.rect(boxX, y, boxWidth, height).fill(isTechnical ? "#111827" : COLORS.tableHeader);
+      doc.rect(boxX, y, boxWidth, height).fill(style.headerFill);
       doc
         .moveTo(boxX, y)
         .lineTo(boxX + boxWidth, y)
-        .lineWidth(isTechnical ? 1 : 1.5)
-        .strokeColor(isTechnical ? "#111827" : COLORS.text)
+        .lineWidth(style.bottomHeaderLineWidth)
+        .strokeColor(style.bottomHeaderLine)
         .stroke();
     } else if (index > 0) {
       doc
@@ -625,7 +704,7 @@ const drawTotals = (doc, estimation, startY) => {
     doc
       .font(grand ? "Helvetica-Bold" : "Helvetica")
       .fontSize(grand ? 6.2 : 5.8)
-      .fillColor(grand && isTechnical ? COLORS.white : grand ? COLORS.text : COLORS.soft)
+      .fillColor(grand ? style.headerText : COLORS.soft)
       .text(String(label).toUpperCase(), boxX + 8, y + (grand ? 5.5 : 4.5), {
         width: 110,
         characterSpacing: grand ? 0.7 : 0.4,
@@ -634,7 +713,7 @@ const drawTotals = (doc, estimation, startY) => {
     doc
       .font(grand ? "Courier-Bold" : "Courier")
       .fontSize(grand ? 7.4 : 6.5)
-      .fillColor(grand && isTechnical ? COLORS.white : COLORS.text)
+      .fillColor(grand ? style.headerText : COLORS.text)
       .text(value, boxX + 118, y + (grand ? 5 : 4.5), {
         width: boxWidth - 127,
         align: "right",
@@ -1006,7 +1085,10 @@ export const generateEstimationPdf = async (estimationInput, options = {}) => {
   return { filePath, fileName, publicUrl };
 };
 
-export const ensureEstimationTemplatePreviewPdfs = async () => {
+// In-memory cache: { [templateId]: publicUrl }
+const _previewPdfCache = {};
+
+export const ensureEstimationTemplatePreviewPdfs = async ({ forceRegenerate = false } = {}) => {
   await ensureDirectory(estimationPreviewPdfDirectory);
 
   const previews = await Promise.all(
@@ -1014,11 +1096,24 @@ export const ensureEstimationTemplatePreviewPdfs = async () => {
       const fileName = `${template.id}.pdf`;
       const filePath = path.join(estimationPreviewPdfDirectory, fileName);
       const publicUrl = `/uploads/estimation-template-previews/${fileName}`;
+
+      // Return cached URL immediately if not forced and file exists on disk
+      if (!forceRegenerate && _previewPdfCache[template.id] && fs.existsSync(filePath)) {
+        return { id: template.id, previewPdfUrl: _previewPdfCache[template.id] };
+      }
+
+      // Also skip regeneration if file already exists on disk (e.g. after server restart)
+      if (!forceRegenerate && fs.existsSync(filePath)) {
+        _previewPdfCache[template.id] = publicUrl;
+        return { id: template.id, previewPdfUrl: publicUrl };
+      }
+
       try {
         await generateEstimationPdf(
           { ...previewEstimation, printTemplate: template.id },
           { outputDirectory: estimationPreviewPdfDirectory, fileName, publicUrl }
         );
+        _previewPdfCache[template.id] = publicUrl;
       } catch (error) {
         console.error(`Failed to generate estimation preview PDF for template "${template.id}":`, error);
         return { id: template.id, previewPdfUrl: null };
@@ -1029,3 +1124,7 @@ export const ensureEstimationTemplatePreviewPdfs = async () => {
 
   return previews.reduce((acc, p) => { acc[p.id] = p.previewPdfUrl; return acc; }, {});
 };
+
+// Call this after any styling change to force fresh preview PDFs
+export const regenerateEstimationTemplatePreviewPdfs = () =>
+  ensureEstimationTemplatePreviewPdfs({ forceRegenerate: true });

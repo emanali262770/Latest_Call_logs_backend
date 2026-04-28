@@ -326,8 +326,8 @@ const drawSubjectAttention = (doc, quotation, startY) => {
     });
 
   doc
-    .moveTo(dividerX, startY)
-    .lineTo(dividerX, startY + 34)
+    .moveTo(dividerX, startY - 14)
+    .lineTo(dividerX, startY + 50)
     .lineWidth(0.75)
     .strokeColor(COLORS.border)
     .stroke();
@@ -379,12 +379,78 @@ const drawSectionHeader = (doc, label, y) => {
     .stroke();
 };
 
-const drawItemDescriptionCell = (doc, item, x, y, width) => {
-  const paddingX = 6;
-  const paddingY = 7;
-  const imageSize = 28;
-  const imageGap = 5;
-  const hasImage = Boolean(item.imageSource);
+const getCompactLevel = (itemCount) => {
+  if (itemCount > 28) return 2;
+  if (itemCount > 14) return 1;
+  return 0;
+};
+
+const COMPACT_PARAMS = [
+  // level 0: normal (≤14 items)
+  { paddingX: 3, paddingY: 1.4, imageSize: 14, imageGap: 2, nameFontSize: 6.5, descFontSize: 5.5, minRowHeight: 16, showDesc: true },
+  // level 1: compact (15-28 items)
+  { paddingX: 2.5, paddingY: 1.2, imageSize: 10, imageGap: 2, nameFontSize: 6.0, descFontSize: 5.0, minRowHeight: 12, showDesc: true },
+  // level 2: ultra (>28 items) — fits 40+ items on one page
+  { paddingX: 2, paddingY: 1.0, imageSize: 0, imageGap: 0, nameFontSize: 5.5, descFontSize: 4.6, minRowHeight: 9, showDesc: true },
+];
+
+const TABLE_STYLES = {
+  default: {
+    headerFill: COLORS.tableHeader,
+    headerStroke: COLORS.border,
+    headerText: COLORS.text,
+    headerDivider: "#dddddd",
+    bodyStroke: COLORS.lightBorder,
+    altRowFill: COLORS.altRow,
+    bottomHeaderLine: COLORS.text,
+    bottomHeaderLineWidth: 1.5,
+  },
+  technical_bid: {
+    headerFill: "#f6f8fb",
+    headerStroke: "#b9c3d1",
+    headerText: "#111827",
+    headerDivider: "#d9e1ec",
+    bodyStroke: "#dfe5ee",
+    altRowFill: "#fbfcfe",
+    bottomHeaderLine: "#111827",
+    bottomHeaderLineWidth: 1.15,
+  },
+  modern_clean: {
+    headerFill: "#1264a3",
+    headerStroke: "#0d4f82",
+    headerText: "#ffffff",
+    headerDivider: "#1a7abf",
+    bodyStroke: "#d0e8f7",
+    altRowFill: "#f0f7ff",
+    bottomHeaderLine: "#0d4f82",
+    bottomHeaderLineWidth: 1.5,
+  },
+  premium_tax: {
+    headerFill: "#0f3d2e",
+    headerStroke: "#c9a24d",
+    headerText: "#f5e6bc",
+    headerDivider: "#1a5c44",
+    bodyStroke: "#d6c89a",
+    altRowFill: "#fdfaf3",
+    bottomHeaderLine: "#c9a24d",
+    bottomHeaderLineWidth: 1.5,
+  },
+  compact_commercial: {
+    headerFill: "#111827",
+    headerStroke: "#374151",
+    headerText: "#f9fafb",
+    headerDivider: "#374151",
+    bodyStroke: "#e5e7eb",
+    altRowFill: "#f9fafb",
+    bottomHeaderLine: "#374151",
+    bottomHeaderLineWidth: 1.2,
+  },
+};
+
+const drawItemDescriptionCell = (doc, item, x, y, width, compactLevel = 0) => {
+  const cp = COMPACT_PARAMS[compactLevel];
+  const { paddingX, paddingY, imageSize, imageGap, nameFontSize, descFontSize } = cp;
+  const hasImage = Boolean(item.imageSource) && imageSize > 0;
 
   let textX = x + paddingX;
   let textWidth = width - paddingX * 2;
@@ -403,65 +469,48 @@ const drawItemDescriptionCell = (doc, item, x, y, width) => {
 
   doc
     .font("Helvetica-Bold")
-    .fontSize(8.5)
+    .fontSize(nameFontSize)
     .fillColor(COLORS.text)
-    .text(v(item.itemName), textX, y + paddingY, {
-      width: textWidth,
-      lineGap: 0,
-    });
+    .text(v(item.itemName), textX, y + paddingY, { width: textWidth, lineGap: -1 });
 
-  if (v(item.description) !== "-") {
-    const nameHeight = doc.heightOfString(v(item.itemName), {
-      width: textWidth,
-      lineGap: 0,
-    });
-
+  if (cp.showDesc && v(item.description) !== "-") {
+    const nameHeight = doc.heightOfString(v(item.itemName), { width: textWidth, lineGap: -1 });
     doc
       .font("Helvetica")
-      .fontSize(7.5)
+      .fontSize(descFontSize)
       .fillColor("#666666")
-      .text(v(item.description), textX, y + paddingY + nameHeight + 2, {
-        width: textWidth,
-        lineGap: 0,
-      });
+      .text(v(item.description), textX, y + paddingY + nameHeight, { width: textWidth, lineGap: -1 });
   }
 };
 
-const getItemDescriptionHeight = (doc, item, width) => {
-  const paddingX = 6;
-  const imageSize = 28;
-  const imageGap = 5;
-  const hasImage = Boolean(item.imageSource);
+const getItemDescriptionHeight = (doc, item, width, compactLevel = 0) => {
+  const cp = COMPACT_PARAMS[compactLevel];
+  const { paddingX, imageSize, imageGap, nameFontSize, descFontSize, minRowHeight } = cp;
+  const hasImage = Boolean(item.imageSource) && imageSize > 0;
   const textWidth = width - paddingX * 2 - (hasImage ? imageSize + imageGap : 0);
 
-  const nameHeight = doc.heightOfString(v(item.itemName), {
-    width: textWidth,
-    lineGap: 0,
-  });
+  doc.font("Helvetica-Bold").fontSize(nameFontSize);
+  const nameHeight = doc.heightOfString(v(item.itemName), { width: textWidth, lineGap: -1 });
 
-  const descriptionHeight =
-    v(item.description) !== "-"
-      ? doc.heightOfString(v(item.description), {
-          width: textWidth,
-          lineGap: 0,
-        })
-      : 0;
+  let descriptionHeight = 0;
+  if (cp.showDesc && v(item.description) !== "-") {
+    doc.font("Helvetica").fontSize(descFontSize);
+    descriptionHeight = doc.heightOfString(v(item.description), { width: textWidth, lineGap: -1 });
+  }
 
-  const textHeight = nameHeight + (descriptionHeight ? descriptionHeight + 2 : 0);
-  return Math.max(26, textHeight + 14, hasImage ? imageSize + 14 : 0);
+  const textHeight = nameHeight + descriptionHeight;
+  return Math.max(minRowHeight, textHeight + cp.paddingY * 2, hasImage ? imageSize + cp.paddingY * 2 : 0);
 };
 
 const drawItemsTable = (doc, quotation, y) => {
   const isWithTax = isWithTaxMode(quotation);
-  const isTechnical = quotation.printTemplate === "technical_bid";
+  const template = quotation.printTemplate || "default";
+  const style = TABLE_STYLES[template] || TABLE_STYLES.default;
+  const items = quotation.items || [];
+  const compactLevel = getCompactLevel(items.length);
   const x = mm(16);
   const tableWidth = PAGE.width - mm(32);
-  const headerHeight = 24;
-  const rowMinHeight = 26;
-  const headerFill = isTechnical ? "#f6f8fb" : COLORS.tableHeader;
-  const headerStroke = isTechnical ? "#b9c3d1" : COLORS.border;
-  const bodyStroke = isTechnical ? "#dfe5ee" : COLORS.lightBorder;
-  const headerText = isTechnical ? "#111827" : COLORS.text;
+  const headerHeight = compactLevel === 2 ? 13 : compactLevel === 1 ? 16 : 22;
 
   const columns = isWithTax
     ? [
@@ -481,8 +530,8 @@ const drawItemsTable = (doc, quotation, y) => {
         { key: "amount", label: "Total", width: 92.28, align: "right" },
       ];
 
-  doc.rect(x, y, tableWidth, headerHeight).fill(headerFill);
-  doc.rect(x, y, tableWidth, headerHeight).lineWidth(isTechnical ? 0.9 : 0.75).strokeColor(headerStroke).stroke();
+  doc.rect(x, y, tableWidth, headerHeight).fill(style.headerFill);
+  doc.rect(x, y, tableWidth, headerHeight).lineWidth(0.75).strokeColor(style.headerStroke).stroke();
 
   let currentX = x;
   columns.forEach((col, index) => {
@@ -491,18 +540,22 @@ const drawItemsTable = (doc, quotation, y) => {
         .moveTo(currentX, y)
         .lineTo(currentX, y + headerHeight)
         .lineWidth(0.75)
-        .strokeColor(isTechnical ? "#d9e1ec" : "#dddddd")
+        .strokeColor(style.headerDivider)
         .stroke();
     }
 
+    const headerFontSize = compactLevel === 2 ? 4.2 : compactLevel === 1 ? 5.6 : 6.5;
+    // vertically center text in header row
+    const headerTopPad = compactLevel === 2 ? 3 : compactLevel === 1 ? 5 : 8;
+
     doc
       .font("Helvetica-Bold")
-      .fontSize(6.8)
-      .fillColor(headerText)
-      .text(col.label.toUpperCase(), currentX + 6, y + 8, {
-        width: col.width - 12,
+      .fontSize(headerFontSize)
+      .fillColor(style.headerText)
+      .text(col.label.toUpperCase(), currentX + 4, headerTopPad + y, {
+        width: col.width - 10,
         align: col.align,
-        characterSpacing: 0.8,
+        characterSpacing: 0.5,
       });
 
     currentX += col.width;
@@ -511,34 +564,33 @@ const drawItemsTable = (doc, quotation, y) => {
   doc
     .moveTo(x, y + headerHeight)
     .lineTo(x + tableWidth, y + headerHeight)
-    .lineWidth(isTechnical ? 1.15 : 1.5)
-    .strokeColor(isTechnical ? "#111827" : COLORS.text)
+    .lineWidth(style.bottomHeaderLineWidth)
+    .strokeColor(style.bottomHeaderLine)
     .stroke();
 
-  let rowY = y + headerHeight;
-  const items = quotation.items || [];
+  // 1pt gap to prevent border collision with first row
+  let rowY = y + headerHeight + 1;
 
   if (!items.length) {
-    doc.rect(x, rowY, tableWidth, rowMinHeight).lineWidth(0.5).strokeColor(bodyStroke).stroke();
+    doc.rect(x, rowY, tableWidth, 22).lineWidth(0.5).strokeColor(style.bodyStroke).stroke();
     doc
       .font("Helvetica")
-      .fontSize(8)
+      .fontSize(6)
       .fillColor("#999999")
-      .text("No line items found.", x, rowY + 9, {
-        width: tableWidth,
-        align: "center",
-      });
-    return rowY + rowMinHeight;
+      .text("No line items found.", x, rowY + 7, { width: tableWidth, align: "center" });
+    return rowY + 22;
   }
 
+  const descColIndex = columns.findIndex((col) => col.key === "description");
+  const descCol = columns[descColIndex];
+
   items.forEach((item, index) => {
-    const rowHeight = Math.max(rowMinHeight, getItemDescriptionHeight(doc, item, columns[1].width));
+    const rowHeight = getItemDescriptionHeight(doc, item, descCol.width, compactLevel);
 
     if (index % 2 === 1) {
-      doc.rect(x, rowY, tableWidth, rowHeight).fill(isTechnical ? "#fbfcfe" : COLORS.altRow);
+      doc.rect(x, rowY, tableWidth, rowHeight).fill(style.altRowFill);
     }
-
-    doc.rect(x, rowY, tableWidth, rowHeight).lineWidth(0.5).strokeColor(bodyStroke).stroke();
+    doc.rect(x, rowY, tableWidth, rowHeight).lineWidth(0.5).strokeColor(style.bodyStroke).stroke();
 
     currentX = x;
     columns.forEach((col, colIndex) => {
@@ -547,12 +599,12 @@ const drawItemsTable = (doc, quotation, y) => {
           .moveTo(currentX, rowY)
           .lineTo(currentX, rowY + rowHeight)
           .lineWidth(0.75)
-          .strokeColor(bodyStroke)
+          .strokeColor(style.bodyStroke)
           .stroke();
       }
 
       if (col.key === "description") {
-        drawItemDescriptionCell(doc, item, currentX, rowY, col.width);
+        drawItemDescriptionCell(doc, item, currentX, rowY, col.width, compactLevel);
       } else {
         let value = "";
         if (col.key === "sr") value = String(index + 1);
@@ -563,12 +615,17 @@ const drawItemsTable = (doc, quotation, y) => {
         if (col.key === "totalWithGst") value = formatMoney(item.totalWithGst);
         if (col.key === "amount") value = formatMoney(item.amount);
 
+        const isNum = col.key !== "sr";
+        const fontSize = col.key === "sr"
+          ? (compactLevel === 2 ? 4.5 : compactLevel === 1 ? 5.5 : 6.4)
+          : (compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0);
+
         doc
-          .font(col.key === "sr" ? "Helvetica" : "Courier")
-          .fontSize(col.key === "sr" ? 8 : 8.2)
+          .font(isNum ? "Courier" : "Helvetica")
+          .fontSize(fontSize)
           .fillColor(col.key === "sr" ? "#999999" : COLORS.text)
-          .text(value, currentX + 6, rowY + 7, {
-            width: col.width - 12,
+          .text(value, currentX + 4, rowY + Math.max(2, (rowHeight - fontSize) / 2), {
+            width: col.width - 10,
             align: col.align,
             lineBreak: false,
             ellipsis: true,
@@ -586,11 +643,12 @@ const drawItemsTable = (doc, quotation, y) => {
 
 const drawTotals = (doc, quotation, startY) => {
   const isWithTax = isWithTaxMode(quotation);
-  const isTechnical = quotation.printTemplate === "technical_bid";
+  const template = quotation.printTemplate || "default";
+  const style = TABLE_STYLES[template] || TABLE_STYLES.default;
   const boxWidth = mm(72);
   const tableRightX = mm(16) + (PAGE.width - mm(32));
   const boxX = tableRightX - boxWidth;
-  const rowHeight = 20;
+  const rowHeight = 14;
   let y = startY + 8;
 
   const rows = [];
@@ -608,18 +666,18 @@ const drawTotals = (doc, quotation, startY) => {
   }
   rows.push(["Grand Total (PKR)", formatMoney(quotation.grandTotal), true]);
 
-  const totalHeight = rows.reduce((sum, row) => sum + (row[2] ? 24 : rowHeight), 0);
-  doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(isTechnical ? 0.9 : 0.75).strokeColor(isTechnical ? "#b9c3d1" : COLORS.border).stroke();
+  const totalHeight = rows.reduce((sum, row) => sum + (row[2] ? 17 : rowHeight), 0);
+  doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(0.75).strokeColor(style.headerStroke).stroke();
 
   rows.forEach(([label, value, grand], index) => {
-    const h = grand ? 24 : rowHeight;
+    const h = grand ? 17 : rowHeight;
     if (grand) {
-      doc.rect(boxX, y, boxWidth, h).fill(isTechnical ? "#111827" : COLORS.tableHeader);
+      doc.rect(boxX, y, boxWidth, h).fill(style.headerFill);
       doc
         .moveTo(boxX, y)
         .lineTo(boxX + boxWidth, y)
-        .lineWidth(isTechnical ? 1 : 1.5)
-        .strokeColor(isTechnical ? "#111827" : COLORS.text)
+        .lineWidth(style.bottomHeaderLineWidth)
+        .strokeColor(style.bottomHeaderLine)
         .stroke();
     } else if (index > 0) {
       doc
@@ -630,21 +688,25 @@ const drawTotals = (doc, quotation, startY) => {
         .stroke();
     }
 
+    // Vertically center text within row box
+    const labelFontSize = grand ? 6.6 : 7.0;
+    const valueFontSize = grand ? 7.4 : 8.5;
+    const topPad = (h - valueFontSize) / 2;
     doc
       .font(grand ? "Helvetica-Bold" : "Helvetica")
-      .fontSize(grand ? 7.5 : 7)
-      .fillColor(grand && isTechnical ? COLORS.white : grand ? COLORS.text : COLORS.soft)
-      .text(String(label).toUpperCase(), boxX + 9, y + (grand ? 8 : 6.5), {
-        width: 110,
-        characterSpacing: grand ? 1 : 0.6,
+      .fontSize(labelFontSize)
+      .fillColor(grand ? style.headerText : COLORS.soft)
+      .text(String(label).toUpperCase(), boxX + 5, y + topPad, {
+        width: (boxWidth / 2) - 8,
+        characterSpacing: grand ? 0.6 : 0.3,
       });
 
     doc
       .font(grand ? "Courier-Bold" : "Courier")
-      .fontSize(grand ? 10 : 8.5)
-      .fillColor(grand && isTechnical ? COLORS.white : COLORS.text)
-      .text(value, boxX + 118, y + (grand ? 7 : 6.5), {
-        width: boxWidth - 127,
+      .fontSize(valueFontSize)
+      .fillColor(grand ? style.headerText : COLORS.text)
+      .text(value, boxX + 5, y + topPad, {
+        width: boxWidth - 10,
         align: "right",
       });
 
@@ -659,15 +721,22 @@ const drawTerms = (doc, startY) => {
 
   const x = mm(16);
   const width = PAGE.width - mm(32);
-  let y = startY + 16;
-  const bulletX = x + 4;
-  const textX = x + 16;
+  let y = startY + 12;
+  // HTML: gap=3pt from bullet left edge, text starts after bullet (3.5pt circle + 3pt gap)
+  const bulletLeft = x + 3;
+  const bulletSize = 3.5; // diameter matching HTML 3.5pt
+  const bulletRadius = bulletSize / 2;
+  const textX = bulletLeft + bulletSize + 3; // 3pt gap between bullet and text
   const textWidth = width - (textX - x);
-  const fontSize = 7.8;
-  const bulletRadius = 2.1;
+  const fontSize = 6.5;
+  const lineGap = 0.2;
 
   TERMS.forEach((term) => {
-    doc.circle(bulletX, y + 4.8, bulletRadius).lineWidth(1.4).strokeColor(COLORS.text).stroke();
+    doc
+      .circle(bulletLeft + bulletRadius, y + 2 + bulletRadius, bulletRadius)
+      .lineWidth(1.5)
+      .strokeColor(COLORS.text)
+      .stroke();
 
     doc
       .font("Helvetica")
@@ -675,22 +744,19 @@ const drawTerms = (doc, startY) => {
       .fillColor("#444444")
       .text(term, textX, y, {
         width: textWidth,
-        lineGap: 0,
+        lineGap,
       });
 
-    const textHeight = doc.heightOfString(term, {
-      width: textWidth,
-      lineGap: 0,
-    });
+    const textHeight = doc.heightOfString(term, { width: textWidth, lineGap });
 
-    y += Math.max(fontSize + 3, textHeight + 2);
+    y += textHeight + 0.4;
   });
 
   return y;
 };
 
 const drawFooter = (doc, endY) => {
-  const y = Math.min(endY + 10, 774);
+  const y = Math.min(endY + 6, 774);
   const x = mm(16);
   const signWidth = mm(55);
   const signX = PAGE.right - mm(16) - signWidth;
@@ -1019,8 +1085,8 @@ export const generateQuotationPdf = async (quotationInput, options = {}) => {
   drawSectionHeader(doc, "Commercial Offer", afterSubjectY + 4);
   const tableEndY = drawItemsTable(doc, quotation, afterSubjectY + 20);
   const totalsEndY = drawTotals(doc, quotation, tableEndY);
-  const termsEndY = drawTerms(doc, totalsEndY + 12);
-  drawFooter(doc, termsEndY + 4);
+  const termsEndY = drawTerms(doc, totalsEndY + 8);
+  drawFooter(doc, termsEndY + 2);
 
   doc.end();
 
