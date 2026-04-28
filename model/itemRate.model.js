@@ -37,6 +37,7 @@ const itemRateSelectClause = `
     m.manufacturer_name AS manufacturer,
     i.item_code AS itemCode,
     i.item_name AS item,
+    i.image,
     i.unit_qty AS qty,
     i.purchase_price AS purchasePrice
   FROM item_rates ir

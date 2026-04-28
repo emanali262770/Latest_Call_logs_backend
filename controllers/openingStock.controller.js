@@ -23,6 +23,79 @@ export const getOpeningStockItems = async (req, res) => {
   }
 };
 
+export const bulkUpdateOpeningStock = async (req, res) => {
+  try {
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return errorResponse(res, "items array is required and must not be empty", 400);
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const item of items) {
+      const { id, purchase_price, sale_price, stock } = item;
+
+      if (!id) {
+        errors.push({ id, error: "id is required" });
+        continue;
+      }
+
+      const parsedPurchasePrice = Number(purchase_price);
+      const parsedSalePrice = Number(sale_price);
+      const parsedStock = Number(stock);
+
+      if (!Number.isFinite(parsedPurchasePrice) || parsedPurchasePrice < 0) {
+        errors.push({ id, error: "purchase_price must be a valid non-negative number" });
+        continue;
+      }
+
+      if (!Number.isFinite(parsedSalePrice) || parsedSalePrice < 0) {
+        errors.push({ id, error: "sale_price must be a valid non-negative number" });
+        continue;
+      }
+
+      if (!Number.isFinite(parsedStock) || parsedStock < 0) {
+        errors.push({ id, error: "stock must be a valid non-negative number" });
+        continue;
+      }
+
+      const existingItem = await getItemDefinitionByIdModel(id);
+      if (!existingItem) {
+        errors.push({ id, error: "Item not found" });
+        continue;
+      }
+
+      await updateOpeningStockModel(id, {
+        purchase_price: parsedPurchasePrice,
+        sale_price: parsedSalePrice,
+        stock: parsedStock,
+      });
+
+      const updatedItem = await getItemDefinitionByIdModel(id);
+      const boxes =
+        updatedItem.unit_qty > 0
+          ? parseFloat((parsedStock / updatedItem.unit_qty).toFixed(2))
+          : 0;
+
+      results.push({ ...updatedItem, boxes });
+    }
+
+    if (errors.length > 0 && results.length === 0) {
+      return errorResponse(res, "All items failed to update", 400, { errors });
+    }
+
+    return successResponse(res, "Opening stock bulk updated successfully", {
+      updated: results,
+      errors,
+    });
+  } catch (error) {
+    console.error("bulkUpdateOpeningStock error:", error);
+    return errorResponse(res, "Failed to bulk update opening stock", 500);
+  }
+};
+
 export const updateOpeningStock = async (req, res) => {
   try {
     const { id } = req.params;
