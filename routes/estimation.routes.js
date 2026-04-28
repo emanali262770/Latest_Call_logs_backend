@@ -3,6 +3,7 @@ import {
   createEstimation,
   deleteEstimation,
   getEstimationById,
+  getEstimationTemplates,
   getEstimations,
   printEstimationById,
   printEstimations,
@@ -18,6 +19,13 @@ router.post(
   protect,
   checkPermission("INVENTORY.ESTIMATION.CREATE"),
   createEstimation
+);
+
+router.get(
+  "/print-templates",
+  protect,
+  checkPermission("INVENTORY.ESTIMATION.READ"),
+  getEstimationTemplates
 );
 
 router.get(

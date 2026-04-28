@@ -15,6 +15,12 @@ import { getServiceByIdModel } from "../model/service.model.js";
 import { getItemRateByIdModel } from "../model/itemRate.model.js";
 import { getCompanySummaryModel } from "../model/company.model.js";
 import { sendEstimationDelivery } from "../services/estimationDelivery.service.js";
+import {
+  DEFAULT_ESTIMATION_TEMPLATE,
+  getEstimationPrintTemplates,
+  isValidEstimationTemplate,
+} from "../services/estimationPrintTemplate.service.js";
+import { ensureEstimationTemplatePreviewPdfs } from "../services/estimationPdf.service.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 const toNumber = (value, fallback = 0) => {
@@ -50,6 +56,11 @@ const roundMoney = (value) =>
 const normalizeTaxMode = (value) => {
   const normalized = toNullable(value);
   return normalized === "withTax" || normalized === "withoutTax" ? normalized : null;
+};
+
+const normalizePrintTemplate = (value) => {
+  const s = toNullable(value);
+  return s && isValidEstimationTemplate(s) ? s : DEFAULT_ESTIMATION_TEMPLATE;
 };
 
 const buildEstimationsSummary = (estimations) => {
@@ -258,6 +269,7 @@ export const createEstimation = async (req, res) => {
 
     const estimate_id = await getNextEstimateIdModel();
     const totals = buildTotals(normalized.items, taxMode);
+    const print_template = normalizePrintTemplate(req.body.print_template ?? req.body.printTemplate);
 
     await connection.beginTransaction();
 
@@ -269,6 +281,7 @@ export const createEstimation = async (req, res) => {
       designation: customerDesignation,
       service_id: resolvedServiceId,
       tax_mode: taxMode,
+      print_template,
       created_by: req.user?.id ?? null,
       ...totals,
       status: status ?? "active",
@@ -388,6 +401,9 @@ export const updateEstimation = async (req, res) => {
     }
 
     const totals = buildTotals(normalized.items, taxMode);
+    const print_template = normalizePrintTemplate(
+      req.body.print_template ?? req.body.printTemplate ?? existing.printTemplate
+    );
 
     await connection.beginTransaction();
 
@@ -398,6 +414,7 @@ export const updateEstimation = async (req, res) => {
       designation: customerDesignation,
       service_id: resolvedServiceId,
       tax_mode: taxMode,
+      print_template,
       ...totals,
       status: status ?? existing.status,
     });
@@ -443,6 +460,27 @@ export const deleteEstimation = async (req, res) => {
     return errorResponse(res, "Failed to delete estimation", 500);
   } finally {
     connection.release();
+  }
+};
+
+export const getEstimationTemplates = async (req, res) => {
+  try {
+    const templates = getEstimationPrintTemplates();
+    const previewUrls = await ensureEstimationTemplatePreviewPdfs();
+    const version = Date.now();
+    const withPreviews = templates.map(({ previewHtml, ...template }) => {
+      const previewPdfUrl = previewUrls[template.id] ?? null;
+
+      return {
+        ...template,
+        previewType: "pdf",
+        previewPdfUrl: previewPdfUrl ? `${previewPdfUrl}?v=${version}` : null,
+      };
+    });
+    return successResponse(res, "Estimation templates fetched successfully", withPreviews);
+  } catch (error) {
+    console.error("getEstimationTemplates error:", error);
+    return errorResponse(res, "Failed to fetch estimation templates", 500);
   }
 };
 

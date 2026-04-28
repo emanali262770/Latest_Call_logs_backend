@@ -18,6 +18,14 @@ import { getServiceByIdModel } from "../model/service.model.js";
 import { getItemRateByIdModel } from "../model/itemRate.model.js";
 import { getCompanySummaryModel } from "../model/company.model.js";
 import { sendQuotationDelivery } from "../services/quotationDelivery.service.js";
+import {
+  DEFAULT_QUOTATION_TEMPLATE,
+  getQuotationPrintTemplates,
+  isValidQuotationTemplate,
+  renderQuotationHtml,
+} from "../services/quotationPrintTemplate.service.js";
+import { ensureQuotationTemplatePreviewPdfs, generateQuotationPdf } from "../services/quotationPdf.service.js";
+import fs from "fs";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 const letterCodes = {
@@ -53,6 +61,11 @@ const normalizeLetterType = (value) => {
 const normalizeTaxMode = (value) => {
   const normalized = toNullable(value);
   return normalized === "withTax" || normalized === "withoutTax" ? normalized : null;
+};
+
+const normalizePrintTemplate = (value) => {
+  const normalized = toNullable(value) ?? DEFAULT_QUOTATION_TEMPLATE;
+  return isValidQuotationTemplate(normalized) ? normalized : null;
 };
 
 const buildSummary = (items, taxMode) => ({
@@ -138,6 +151,13 @@ const buildQuotationPayload = async (body, existing = null) => {
     return { error: "taxMode is required" };
   }
 
+  const printTemplate = normalizePrintTemplate(
+    body.printTemplate ?? body.print_template ?? existing?.printTemplate
+  );
+  if (!printTemplate) {
+    return { error: "printTemplate is invalid" };
+  }
+
   const customerId = toNullable(body.customerId ?? body.customer_id ?? existing?.customerId);
   if (!customerId) {
     return { error: "customerId is required" };
@@ -178,6 +198,7 @@ const buildQuotationPayload = async (body, existing = null) => {
       service_name: serviceName,
       letter_type: letterType,
       tax_mode: taxMode,
+      print_template: printTemplate,
       items: normalized.items,
       summary,
       status: body.status ?? existing?.status ?? "active",
@@ -249,6 +270,24 @@ export const getNextRevisionId = async (req, res) => {
   } catch (error) {
     console.error("getNextRevisionId error:", error);
     return errorResponse(res, "Failed to fetch next revision ID", 500);
+  }
+};
+
+export const getQuotationTemplates = async (req, res) => {
+  try {
+    const previewPdfUrlsById = await ensureQuotationTemplatePreviewPdfs();
+
+    return successResponse(res, "Quotation print templates fetched successfully", {
+      defaultTemplate: DEFAULT_QUOTATION_TEMPLATE,
+      templates: getQuotationPrintTemplates().map(({ previewHtml, ...template }) => ({
+        ...template,
+        previewType: "pdf",
+        previewPdfUrl: previewPdfUrlsById[template.id] ?? null,
+      })),
+    });
+  } catch (error) {
+    console.error("getQuotationTemplates error:", error);
+    return errorResponse(res, "Failed to fetch quotation templates", 500);
   }
 };
 
@@ -499,6 +538,59 @@ export const printQuotationById = async (req, res) => {
   } catch (error) {
     console.error("printQuotationById error:", error);
     return errorResponse(res, "Failed to fetch quotation for print", 500);
+  }
+};
+
+export const printQuotationHtml = async (req, res) => {
+  try {
+    const quotation = await getQuotationByIdModel(req.params.id);
+    if (!quotation) {
+      return errorResponse(res, "Quotation not found", 404);
+    }
+
+    const company = await getCompanySummaryModel();
+    const quotationWithItems = await attachItemsAndSummary(quotation);
+    const html = renderQuotationHtml(quotationWithItems, company);
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(html);
+  } catch (error) {
+    console.error("printQuotationHtml error:", error);
+    return errorResponse(res, "Failed to render quotation HTML", 500);
+  }
+};
+
+export const printQuotationPdf = async (req, res) => {
+  try {
+    const quotation = await getQuotationByIdModel(req.params.id);
+    if (!quotation) {
+      return errorResponse(res, "Quotation not found", 404);
+    }
+
+    const company = await getCompanySummaryModel();
+    const quotationWithItems = await attachItemsAndSummary(quotation);
+
+    const { filePath, fileName } = await generateQuotationPdf({
+      ...quotationWithItems,
+      company,
+      forProduct: quotationWithItems.serviceName,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+    stream.on("end", () => {
+      try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+    });
+    stream.on("error", (err) => {
+      console.error("printQuotationPdf stream error:", err);
+      if (!res.headersSent) errorResponse(res, "Failed to stream PDF", 500);
+    });
+  } catch (error) {
+    console.error("printQuotationPdf error:", error);
+    return errorResponse(res, "Failed to generate quotation PDF", 500);
   }
 };
 

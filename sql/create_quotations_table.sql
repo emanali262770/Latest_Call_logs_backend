@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS quotations (
   service_name        VARCHAR(255)   DEFAULT NULL,
   letter_type         ENUM('Letter','Quotation','Bill','Invoice') NOT NULL DEFAULT 'Quotation',
   tax_mode            ENUM('withTax','withoutTax') NOT NULL,
+  print_template      VARCHAR(80)    NOT NULL DEFAULT 'executive_letterhead',
   created_by          INT            DEFAULT NULL,
   total_qty           DECIMAL(15,2)  NOT NULL DEFAULT 0,
   sub_total           DECIMAL(15,2)  NOT NULL DEFAULT 0,

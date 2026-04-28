@@ -6,11 +6,18 @@ import https from "https";
 import { fileURLToPath } from "url";
 import PDFDocument from "pdfkit";
 import sharp from "sharp";
+import {
+  DEFAULT_ESTIMATION_TEMPLATE,
+  estimationPrintTemplates,
+  isValidEstimationTemplate,
+} from "./estimationPrintTemplate.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const estimationPdfDirectory = path.join(projectRoot, "uploads", "estimations");
+const estimationPreviewPdfDirectory = path.join(projectRoot, "uploads", "estimation-template-previews");
+const DUMMY_IMAGE_PATH = path.join(projectRoot, "uploads", "images", "dummy.jpg");
 
 const PAGE = {
   width: 595.28,
@@ -36,8 +43,8 @@ const STATIC_COMPANY_PROFILE = {
   address: "Abid Majeed Road, Lahore Cantt, Lahore",
 };
 
-const ensureDirectory = async () => {
-  await fsPromises.mkdir(estimationPdfDirectory, { recursive: true });
+const ensureDirectory = async (dir) => {
+  await fsPromises.mkdir(dir ?? estimationPdfDirectory, { recursive: true });
 };
 
 const v = (value, fallback = "-") => {
@@ -179,6 +186,9 @@ const normalizeEstimation = (input) => {
     designation: v(input?.designation),
     serviceName: v(input?.service || input?.serviceName),
     taxMode: v(input?.taxMode || input?.tax_mode),
+    printTemplate: isValidEstimationTemplate(input?.printTemplate || input?.print_template)
+      ? input?.printTemplate || input?.print_template
+      : DEFAULT_ESTIMATION_TEMPLATE,
     items,
     anyDiscount,
     isWithTax,
@@ -348,10 +358,10 @@ const drawSectionHeader = (doc, label, y) => {
 };
 
 const drawDescriptionCell = (doc, item, x, y, width) => {
-  const paddingX = 5;
-  const paddingY = 7;
-  const imageSize = 28;
-  const imageGap = 5;
+  const paddingX = 4;
+  const paddingY = 4;
+  const imageSize = 18;
+  const imageGap = 4;
   const hasImage = Boolean(item.imageSource);
 
   let textX = x + paddingX;
@@ -371,61 +381,68 @@ const drawDescriptionCell = (doc, item, x, y, width) => {
 
   doc
     .font("Helvetica-Bold")
-    .fontSize(8.5)
+    .fontSize(6.8)
     .fillColor(COLORS.text)
     .text(item.itemName, textX, y + paddingY, {
       width: textWidth,
-      lineGap: 0,
+      lineGap: -1,
     });
 
   if (item.description && item.description !== "-") {
     const nameHeight = doc.heightOfString(item.itemName, {
       width: textWidth,
-      lineGap: 0,
+      lineGap: -1,
     });
 
     doc
       .font("Helvetica")
-      .fontSize(7.5)
+      .fontSize(5.8)
       .fillColor("#666666")
-      .text(item.description, textX, y + paddingY + nameHeight + 2, {
+      .text(item.description, textX, y + paddingY + nameHeight, {
         width: textWidth,
-        lineGap: 0,
+        lineGap: -1,
       });
   }
 };
 
 const getDescriptionHeight = (doc, item, width) => {
-  const paddingX = 5;
-  const imageSize = 28;
-  const imageGap = 5;
+  const paddingX = 4;
+  const imageSize = 18;
+  const imageGap = 4;
   const hasImage = Boolean(item.imageSource);
   const textWidth = width - paddingX * 2 - (hasImage ? imageSize + imageGap : 0);
 
+  doc.font("Helvetica-Bold").fontSize(6.8);
   const nameHeight = doc.heightOfString(item.itemName, {
     width: textWidth,
-    lineGap: 0,
+    lineGap: -1,
   });
 
+  doc.font("Helvetica").fontSize(5.8);
   const descriptionHeight =
     item.description && item.description !== "-"
       ? doc.heightOfString(item.description, {
           width: textWidth,
-          lineGap: 0,
+          lineGap: -1,
         })
       : 0;
 
-  const textHeight = nameHeight + (descriptionHeight ? descriptionHeight + 2 : 0);
-  return Math.max(36, textHeight + 14, hasImage ? imageSize + 14 : 0);
+  const textHeight = nameHeight + descriptionHeight;
+  return Math.max(22, textHeight + 8, hasImage ? imageSize + 8 : 0);
 };
 
 const drawItemsTable = (doc, estimation, y) => {
   const { anyDiscount, isWithTax, items } = estimation;
+  const isTechnical = estimation.printTemplate === "technical_bid";
   const x = mm(16);
   const tableWidth = PAGE.width - mm(32);
-  const headerHeight = 28;
+  const headerHeight = 20;
+  const headerFill = isTechnical ? "#f6f8fb" : COLORS.tableHeader;
+  const headerStroke = isTechnical ? "#b9c3d1" : COLORS.border;
+  const bodyStroke = isTechnical ? "#dfe5ee" : COLORS.lightBorder;
+  const headerText = isTechnical ? "#111827" : COLORS.text;
 
-  const itemColWidth = anyDiscount ? 160 : 190;
+  const itemColWidth = anyDiscount ? 172 : 210;
 
   const columns = [
     { key: "sr", label: "#", width: 22, align: "center" },
@@ -440,8 +457,8 @@ const drawItemsTable = (doc, estimation, y) => {
   const fixedWidth = columns.slice(0, -1).reduce((sum, col) => sum + col.width, 0);
   columns[columns.length - 1].width = tableWidth - fixedWidth;
 
-  doc.rect(x, y, tableWidth, headerHeight).fill(COLORS.tableHeader);
-  doc.rect(x, y, tableWidth, headerHeight).lineWidth(0.75).strokeColor(COLORS.border).stroke();
+  doc.rect(x, y, tableWidth, headerHeight).fill(headerFill);
+  doc.rect(x, y, tableWidth, headerHeight).lineWidth(isTechnical ? 0.9 : 0.75).strokeColor(headerStroke).stroke();
 
   let currentX = x;
   columns.forEach((col, index) => {
@@ -450,7 +467,7 @@ const drawItemsTable = (doc, estimation, y) => {
         .moveTo(currentX, y)
         .lineTo(currentX, y + headerHeight)
         .lineWidth(0.75)
-        .strokeColor("#dddddd")
+        .strokeColor(isTechnical ? "#d9e1ec" : "#dddddd")
         .stroke();
     }
 
@@ -458,12 +475,12 @@ const drawItemsTable = (doc, estimation, y) => {
     lines.forEach((line, lineIndex) => {
       doc
         .font("Helvetica-Bold")
-        .fontSize(6.8)
-        .fillColor(COLORS.text)
-        .text(line.toUpperCase(), currentX + 5, y + 8 + lineIndex * 9, {
+        .fontSize(5.6)
+        .fillColor(headerText)
+        .text(line.toUpperCase(), currentX + 4, y + 5 + lineIndex * 7, {
           width: col.width - 10,
           align: col.align,
-          characterSpacing: 0.8,
+          characterSpacing: 0.5,
         });
     });
 
@@ -473,23 +490,23 @@ const drawItemsTable = (doc, estimation, y) => {
   doc
     .moveTo(x, y + headerHeight)
     .lineTo(x + tableWidth, y + headerHeight)
-    .lineWidth(1.5)
-    .strokeColor(COLORS.text)
+    .lineWidth(isTechnical ? 1.15 : 1.5)
+    .strokeColor(isTechnical ? "#111827" : COLORS.text)
     .stroke();
 
   let rowY = y + headerHeight;
 
   if (!items.length) {
-    doc.rect(x, rowY, tableWidth, 36).lineWidth(0.5).strokeColor(COLORS.lightBorder).stroke();
+    doc.rect(x, rowY, tableWidth, 22).lineWidth(0.5).strokeColor(bodyStroke).stroke();
     doc
       .font("Helvetica")
-      .fontSize(8)
+      .fontSize(6)
       .fillColor("#999999")
-      .text("No line items found.", x, rowY + 10, {
+      .text("No line items found.", x, rowY + 7, {
         width: tableWidth,
         align: "center",
       });
-    return rowY + 36;
+    return rowY + 22;
   }
 
   items.forEach((item, index) => {
@@ -497,10 +514,10 @@ const drawItemsTable = (doc, estimation, y) => {
     const rowHeight = getDescriptionHeight(doc, item, itemColumn.width);
 
     if (index % 2 === 1) {
-      doc.rect(x, rowY, tableWidth, rowHeight).fill(COLORS.altRow);
+      doc.rect(x, rowY, tableWidth, rowHeight).fill(isTechnical ? "#fbfcfe" : COLORS.altRow);
     }
 
-    doc.rect(x, rowY, tableWidth, rowHeight).lineWidth(0.5).strokeColor(COLORS.lightBorder).stroke();
+    doc.rect(x, rowY, tableWidth, rowHeight).lineWidth(0.5).strokeColor(bodyStroke).stroke();
 
     currentX = x;
     columns.forEach((col, colIndex) => {
@@ -509,7 +526,7 @@ const drawItemsTable = (doc, estimation, y) => {
           .moveTo(currentX, rowY)
           .lineTo(currentX, rowY + rowHeight)
           .lineWidth(0.75)
-          .strokeColor(COLORS.lightBorder)
+          .strokeColor(bodyStroke)
           .stroke();
       }
 
@@ -518,14 +535,14 @@ const drawItemsTable = (doc, estimation, y) => {
       } else {
         let value = "";
         let font = "Courier";
-        let fontSize = 8.2;
+        let fontSize = 6.3;
         let color = COLORS.text;
 
         switch (col.key) {
           case "sr":
             value = String(index + 1);
             font = "Helvetica";
-            fontSize = 8;
+            fontSize = 6;
             color = "#999999";
             break;
           case "qty":
@@ -549,7 +566,7 @@ const drawItemsTable = (doc, estimation, y) => {
           .font(font)
           .fontSize(fontSize)
           .fillColor(color)
-          .text(value, currentX + 5, rowY + (rowHeight - fontSize) / 2, {
+          .text(value, currentX + 4, rowY + Math.max(3, (rowHeight - fontSize) / 2), {
             width: col.width - 10,
             align: col.align,
             lineBreak: false,
@@ -568,11 +585,12 @@ const drawItemsTable = (doc, estimation, y) => {
 
 const drawTotals = (doc, estimation, startY) => {
   const { anyDiscount, isWithTax, subTotal, taxTotal, discountTotal, grandTotal } = estimation;
+  const isTechnical = estimation.printTemplate === "technical_bid";
   const boxWidth = mm(72);
   const tableRightX = mm(16) + (PAGE.width - mm(32));
   const boxX = tableRightX - boxWidth;
-  const rowHeight = 20;
-  let y = startY + 8;
+  const rowHeight = 14;
+  let y = startY + 4;
 
   const rows = [
     ["Sub Total (PKR)", formatMoney(subTotal), false],
@@ -581,19 +599,19 @@ const drawTotals = (doc, estimation, startY) => {
     ["Grand Total (PKR)", formatMoney(grandTotal), true],
   ];
 
-  const totalHeight = rows.reduce((sum, row) => sum + (row[2] ? 24 : rowHeight), 0);
-  doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(0.75).strokeColor(COLORS.border).stroke();
+  const totalHeight = rows.reduce((sum, row) => sum + (row[2] ? 17 : rowHeight), 0);
+  doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(isTechnical ? 0.9 : 0.75).strokeColor(isTechnical ? "#b9c3d1" : COLORS.border).stroke();
 
   rows.forEach(([label, value, grand], index) => {
-    const height = grand ? 24 : rowHeight;
+    const height = grand ? 17 : rowHeight;
 
     if (grand) {
-      doc.rect(boxX, y, boxWidth, height).fill(COLORS.tableHeader);
+      doc.rect(boxX, y, boxWidth, height).fill(isTechnical ? "#111827" : COLORS.tableHeader);
       doc
         .moveTo(boxX, y)
         .lineTo(boxX + boxWidth, y)
-        .lineWidth(1.5)
-        .strokeColor(COLORS.text)
+        .lineWidth(isTechnical ? 1 : 1.5)
+        .strokeColor(isTechnical ? "#111827" : COLORS.text)
         .stroke();
     } else if (index > 0) {
       doc
@@ -606,18 +624,18 @@ const drawTotals = (doc, estimation, startY) => {
 
     doc
       .font(grand ? "Helvetica-Bold" : "Helvetica")
-      .fontSize(grand ? 7.5 : 7)
-      .fillColor(grand ? COLORS.text : COLORS.soft)
-      .text(String(label).toUpperCase(), boxX + 9, y + (grand ? 8 : 6.5), {
+      .fontSize(grand ? 6.2 : 5.8)
+      .fillColor(grand && isTechnical ? COLORS.white : grand ? COLORS.text : COLORS.soft)
+      .text(String(label).toUpperCase(), boxX + 8, y + (grand ? 5.5 : 4.5), {
         width: 110,
-        characterSpacing: grand ? 1 : 0.6,
+        characterSpacing: grand ? 0.7 : 0.4,
       });
 
     doc
       .font(grand ? "Courier-Bold" : "Courier")
-      .fontSize(grand ? 10 : 8.5)
-      .fillColor(COLORS.text)
-      .text(value, boxX + 118, y + (grand ? 7 : 6.5), {
+      .fontSize(grand ? 7.4 : 6.5)
+      .fillColor(grand && isTechnical ? COLORS.white : COLORS.text)
+      .text(value, boxX + 118, y + (grand ? 5 : 4.5), {
         width: boxWidth - 127,
         align: "right",
       });
@@ -625,18 +643,18 @@ const drawTotals = (doc, estimation, startY) => {
     y += height;
   });
 
-  return startY + 8 + totalHeight;
+  return startY + 4 + totalHeight;
 };
 
 const drawFooter = (doc, endY) => {
-  const y = Math.min(endY + 12, 774);
+  const y = Math.min(endY + 8, 774);
   const x = mm(16);
   const signWidth = mm(55);
   const signX = PAGE.right - mm(16) - signWidth;
 
   doc
     .font("Helvetica-Oblique")
-    .fontSize(7.5)
+    .fontSize(6)
     .fillColor(COLORS.soft)
     .text(
       "This estimation is prepared for review purposes only and is subject to change.\nThank you for considering Infinity Byte Solution.",
@@ -644,7 +662,7 @@ const drawFooter = (doc, endY) => {
       y,
       {
         width: mm(95),
-        lineGap: 2,
+        lineGap: 1,
       }
     );
 
@@ -657,7 +675,7 @@ const drawFooter = (doc, endY) => {
 
   doc
     .font("Helvetica-Bold")
-    .fontSize(7.5)
+    .fontSize(6.5)
     .fillColor(COLORS.text)
     .text("AUTHORIZED SIGNATORY", signX, y + 8, {
       width: signWidth,
@@ -667,7 +685,7 @@ const drawFooter = (doc, endY) => {
 
   doc
     .font("Helvetica")
-    .fontSize(6.5)
+    .fontSize(5.8)
     .fillColor(COLORS.soft)
     .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), signX, y + 19, {
       width: signWidth,
@@ -676,8 +694,269 @@ const drawFooter = (doc, endY) => {
     });
 };
 
-export const generateEstimationPdf = async (estimationInput) => {
-  await ensureDirectory();
+const drawTechnicalHeader = (doc, estimation) => {
+  const x = mm(16);
+  const y = 26;
+  const width = PAGE.width - mm(32);
+  const navy = "#101b2d";
+  const blue = "#2457d6";
+  const slate = "#475467";
+
+  doc.rect(0, 0, PAGE.width, 4).fill(blue);
+  doc.rect(x, y, width, 74).lineWidth(0.9).strokeColor("#c7d0dd").stroke();
+  doc.rect(x, y, 150, 74).fill(navy);
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(6.8)
+    .fillColor("#9db7ef")
+    .text("TECHNICAL BID", x + 16, y + 15, { characterSpacing: 2.2 });
+  doc
+    .font("Courier-Bold")
+    .fontSize(12.5)
+    .fillColor(COLORS.white)
+    .text(v(estimation.estimateId), x + 16, y + 33, { width: 120 });
+  doc
+    .font("Helvetica")
+    .fontSize(7)
+    .fillColor("#cbd5e1")
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + 16, y + 52, {
+      width: 120,
+    });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(17)
+    .fillColor(COLORS.text)
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 174, y + 15, { width: 270 });
+  doc
+    .font("Helvetica")
+    .fontSize(7.8)
+    .fillColor(slate)
+    .text(STATIC_COMPANY_PROFILE.address, x + 174, y + 39, {
+      width: 245,
+      lineGap: 2,
+    });
+  doc
+    .font("Helvetica")
+    .fontSize(6.7)
+    .fillColor("#667085")
+    .text("Commercial estimation prepared for review and approval", x + 174, y + 54, {
+      width: 245,
+    });
+
+  return drawSubjectAttention(doc, estimation, 124);
+};
+
+const drawModernHeader = (doc, estimation) => {
+  const x = mm(16);
+  const y = 26;
+  const width = PAGE.width - mm(32);
+
+  doc.roundedRect(x, y, width, 76, 10).fill("#1264a3");
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(17)
+    .fillColor(COLORS.white)
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 18, y + 17, { width: 270 });
+  doc
+    .font("Helvetica")
+    .fontSize(7)
+    .fillColor("#d8ecff")
+    .text(STATIC_COMPANY_PROFILE.address, x + 18, y + 43, { width: 260 });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(6.5)
+    .fillColor("#d8ecff")
+    .text("ESTIMATION", x + width - 160, y + 15, {
+      width: 140,
+      align: "right",
+      characterSpacing: 2,
+    });
+  doc
+    .font("Courier-Bold")
+    .fontSize(13)
+    .fillColor(COLORS.white)
+    .text(v(estimation.estimateId), x + width - 160, y + 31, {
+      width: 140,
+      align: "right",
+    });
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .fillColor("#d8ecff")
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 48, {
+      width: 140,
+      align: "right",
+    });
+
+  return drawSubjectAttention(doc, estimation, 122);
+};
+
+const drawPremiumHeader = (doc, estimation) => {
+  const x = mm(16);
+  const topY = 28;
+  const rightBlockX = 392;
+
+  doc.rect(0, 0, PAGE.width, 8).fill("#0f3d2e");
+  doc.rect(0, 8, PAGE.width, 3).fill("#c9a24d");
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(18)
+    .fillColor("#0f3d2e")
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x, topY, { width: 280 });
+  doc
+    .font("Helvetica")
+    .fontSize(7)
+    .fillColor("#9a7a25")
+    .text("PREMIUM ESTIMATION", x, topY + 21, { characterSpacing: 1.6 });
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .fillColor(COLORS.muted)
+    .text(STATIC_COMPANY_PROFILE.address, x, topY + 34, { width: 260 });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(6.5)
+    .fillColor("#9a7a25")
+    .text("ESTIMATION", rightBlockX, topY + 2, {
+      width: 158,
+      align: "right",
+      characterSpacing: 2.2,
+    });
+  doc
+    .font("Courier-Bold")
+    .fontSize(13)
+    .fillColor("#0f3d2e")
+    .text(v(estimation.estimateId), rightBlockX, topY + 16, {
+      width: 158,
+      align: "right",
+    });
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .fillColor(COLORS.muted)
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), rightBlockX, topY + 33, {
+      width: 158,
+      align: "right",
+    });
+  doc.moveTo(x, 86).lineTo(PAGE.right - mm(16), 86).lineWidth(1.2).strokeColor("#c9a24d").stroke();
+
+  return drawSubjectAttention(doc, estimation, 112);
+};
+
+const drawCompactHeader = (doc, estimation) => {
+  const x = mm(16);
+  const y = 24;
+  const width = PAGE.width - mm(32);
+
+  doc.rect(x, y, width, 52).fill("#111827");
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(15)
+    .fillColor(COLORS.white)
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 16, y + 12, { width: 260 });
+  doc
+    .font("Helvetica")
+    .fontSize(7)
+    .fillColor("#cbd5e1")
+    .text(STATIC_COMPANY_PROFILE.address, x + 16, y + 34, { width: 260 });
+  doc
+    .font("Courier-Bold")
+    .fontSize(11)
+    .fillColor(COLORS.white)
+    .text(v(estimation.estimateId), x + width - 150, y + 12, { width: 130, align: "right" });
+  doc
+    .font("Helvetica")
+    .fontSize(7.5)
+    .fillColor("#cbd5e1")
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 150, y + 30, {
+      width: 130,
+      align: "right",
+    });
+
+  return drawSubjectAttention(doc, estimation, 94);
+};
+
+const drawTemplateIntro = (doc, estimation) => {
+  if (estimation.printTemplate === "modern_clean") return drawModernHeader(doc, estimation);
+  if (estimation.printTemplate === "technical_bid") return drawTechnicalHeader(doc, estimation);
+  if (estimation.printTemplate === "premium_tax") return drawPremiumHeader(doc, estimation);
+  if (estimation.printTemplate === "compact_commercial") return drawCompactHeader(doc, estimation);
+
+  drawTopAccent(doc);
+  drawHeader(doc, estimation);
+  return drawSubjectAttention(doc, estimation, 110);
+};
+
+const previewEstimation = {
+  estimateId: "EST-0003",
+  estimateDate: "2026-04-27",
+  customerName: "Infity Bytes",
+  person: "Eman",
+  designation: "Full stack",
+  serviceName: "cctv",
+  taxMode: "withTax",
+  summary: {
+    saleTotal: 583395,
+    taxTotal: 105011.1,
+    discountTotal: 0,
+    finalTotal: 688406.1,
+  },
+  items: [
+    {
+      itemName: "Samsung Tv",
+      description: "This is samsung tv.",
+      qty: 1,
+      salePrice: 63000,
+      salePriceWithTax: 74340,
+      saleTotal: 63000,
+      saleTotalWithTax: 74340,
+      discountPercent: 0,
+      discountAmount: 0,
+      finalTotal: 74340,
+    },
+    {
+      itemName: "HikVision 8 Channel NVR",
+      description: "NVR recording unit with AI and motion detection support.",
+      qty: 1,
+      salePrice: 37500,
+      salePriceWithTax: 44250,
+      saleTotal: 37500,
+      saleTotalWithTax: 44250,
+      discountPercent: 0,
+      discountAmount: 0,
+      finalTotal: 44250,
+    },
+    {
+      itemName: "DLink 8 Port Manageable Network Switch",
+      description: "Manageable switch for IT equipment with 220 watt adapter.",
+      qty: 3,
+      salePrice: 10965,
+      salePriceWithTax: 12938.7,
+      saleTotal: 32895,
+      saleTotalWithTax: 38816.1,
+      discountPercent: 0,
+      discountAmount: 0,
+      finalTotal: 38816.1,
+    },
+    {
+      itemName: "HikVision 8MP IP Camera DS-260345-NV-I",
+      description:
+        "IP Camera HiKvision 4 MP with 30M IR and 20X Zooming Capacity having AI features of motion and day/night color vision.",
+      qty: 12,
+      salePrice: 37500,
+      salePriceWithTax: 44250,
+      saleTotal: 450000,
+      saleTotalWithTax: 531000,
+      discountPercent: 0,
+      discountAmount: 0,
+      finalTotal: 531000,
+    },
+  ],
+};
+
+export const generateEstimationPdf = async (estimationInput, options = {}) => {
+  const outputDirectory = options.outputDirectory || estimationPdfDirectory;
+  await ensureDirectory(outputDirectory);
 
   const estimation = normalizeEstimation(estimationInput);
 
@@ -689,25 +968,27 @@ export const generateEstimationPdf = async (estimationInput) => {
       }
       if (item.itemImageUrl) {
         item.imageSource = await toPdfImageSource(await fetchImageBuffer(item.itemImageUrl));
+        if (!item.imageSource && fs.existsSync(DUMMY_IMAGE_PATH)) {
+          item.imageSource = await toPdfImageSource(DUMMY_IMAGE_PATH);
+        }
         return;
       }
-      item.imageSource = null;
+      item.imageSource = fs.existsSync(DUMMY_IMAGE_PATH)
+        ? await toPdfImageSource(DUMMY_IMAGE_PATH)
+        : null;
     })
   );
 
   const safeId = String(estimation.estimateId || estimationInput?.id || "estimation").replace(/[^\w-]/g, "-");
-  const fileName = `${safeId}-${Date.now()}.pdf`;
-  const filePath = path.join(estimationPdfDirectory, fileName);
+  const fileName = options.fileName || `${safeId}-${Date.now()}.pdf`;
+  const filePath = path.join(outputDirectory, fileName);
 
   const doc = new PDFDocument({ size: "A4", margin: 0 });
   const stream = fs.createWriteStream(filePath);
   doc.pipe(stream);
 
   doc.rect(0, 0, PAGE.width, PAGE.height).fill(COLORS.white);
-  drawTopAccent(doc);
-  drawHeader(doc, estimation);
-
-  const afterSubjectY = drawSubjectAttention(doc, estimation, 110);
+  const afterSubjectY = drawTemplateIntro(doc, estimation);
   drawSectionHeader(doc, "Items", afterSubjectY + 4);
 
   const tableEndY = drawItemsTable(doc, estimation, afterSubjectY + 20);
@@ -721,6 +1002,30 @@ export const generateEstimationPdf = async (estimationInput) => {
     stream.on("error", reject);
   });
 
-  const publicUrl = `/uploads/estimations/${fileName}`;
+  const publicUrl = options.publicUrl || `/uploads/estimations/${fileName}`;
   return { filePath, fileName, publicUrl };
+};
+
+export const ensureEstimationTemplatePreviewPdfs = async () => {
+  await ensureDirectory(estimationPreviewPdfDirectory);
+
+  const previews = await Promise.all(
+    estimationPrintTemplates.map(async (template) => {
+      const fileName = `${template.id}.pdf`;
+      const filePath = path.join(estimationPreviewPdfDirectory, fileName);
+      const publicUrl = `/uploads/estimation-template-previews/${fileName}`;
+      try {
+        await generateEstimationPdf(
+          { ...previewEstimation, printTemplate: template.id },
+          { outputDirectory: estimationPreviewPdfDirectory, fileName, publicUrl }
+        );
+      } catch (error) {
+        console.error(`Failed to generate estimation preview PDF for template "${template.id}":`, error);
+        return { id: template.id, previewPdfUrl: null };
+      }
+      return { id: template.id, previewPdfUrl: fs.existsSync(filePath) ? publicUrl : null };
+    })
+  );
+
+  return previews.reduce((acc, p) => { acc[p.id] = p.previewPdfUrl; return acc; }, {});
 };

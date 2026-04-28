@@ -6,6 +6,7 @@ import {
   getNextRevisionId,
   getQuotationById,
   getQuotationByRevisionId,
+  getQuotationTemplates,
   getQuotations,
   printQuotationById,
   reviseQuotation,
@@ -29,6 +30,13 @@ router.get(
   protect,
   checkPermission("INVENTORY.QUOTATION.READ"),
   getNextRevisionId
+);
+
+router.get(
+  "/print-templates",
+  protect,
+  checkPermission("INVENTORY.QUOTATION.READ"),
+  getQuotationTemplates
 );
 
 router.get(
