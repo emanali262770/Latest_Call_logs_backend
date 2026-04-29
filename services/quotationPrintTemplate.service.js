@@ -111,7 +111,7 @@ const tableRows = (items) =>
 
 const templateCss = `
   .qt-page{width:794px;min-height:1123px;background:#fff;color:#151823;font-family:Arial,Helvetica,sans-serif;box-sizing:border-box;overflow:hidden}
-  .qt-page *{box-sizing:border-box}
+  .qt-page *{box-sizing:border-box;margin:0;padding:0}
   .qt-company{font-size:25px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
   .qt-muted{color:#667085}
   .qt-kicker{font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase}
@@ -129,16 +129,16 @@ const templateCss = `
 
 const renderExecutive = (q) => `
   <style>${templateCss}</style>
-  <div class="qt-page" style="padding:34px 54px;border-top:7px solid #111827">
+  <div class="qt-page" style="padding:34px 45px;border-top:7px solid #111827">
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid #d0d5dd;padding-bottom:22px">
       <div><div class="qt-company">${esc(q.companyName)}</div><div class="qt-kicker qt-muted">IT Solutions & Services</div><p class="qt-muted">${esc(q.address)}</p></div>
       <div style="text-align:right"><div class="qt-kicker qt-muted">Quotation</div><h2>${esc(q.quotationNo)}</h2><p>${esc(q.quotationDate)}</p></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin:28px 0">
-      <div><div class="qt-kicker qt-muted">Subject</div><h3>${esc(q.subject)}</h3></div>
-      <div><div class="qt-kicker qt-muted">Attention</div><h3>${esc(q.person)} - ${esc(q.designation)}</h3><p>${esc(q.department)}</p></div>
+    <div style="margin:22px 0">
+      <div style="font-size:12px;font-weight:700">${esc(q.customerName)}</div>
+      <div style="font-size:11px;color:#555">Attn: ${esc(q.person)}${q.person && q.designation ? ' - ' : ''}${esc(q.designation)}</div>
+      <div style="font-size:11px;margin-top:4px">Subject:- ${esc(q.subject)}</div>
     </div>
-    <div class="qt-kicker" style="margin-bottom:10px">Commercial Offer</div>
     <table class="qt-table"><thead><tr><th>#</th><th>Description</th><th>Unit Rate</th><th>Qty</th><th>GST Amt</th><th>Rate + GST</th><th>Total</th></tr></thead><tbody>${tableRows(q.items)}</tbody></table>
     <table class="qt-total" style="margin-top:12px"><tr><td>Sub-Total (PKR)</td><td>${money(q.subTotal)}</td></tr><tr><td>GST Amount (PKR)</td><td>${money(q.gstTotal)}</td></tr><tr><td><strong>Grand Total (PKR)</strong></td><td>${money(q.grandTotal)}</td></tr></table>
     <div class="qt-terms"><strong>Terms & Conditions</strong><br>Quoted prices are valid for 30 days. Delivery will be confirmed after purchase order. Payment terms: 50% advance and remaining before handover.</div>
@@ -149,7 +149,8 @@ const renderTechnical = (q) => `
   <style>${templateCss}</style>
   <div class="qt-page" style="display:grid;grid-template-columns:170px 1fr">
     <aside style="background:#182230;color:white;padding:34px 24px"><div class="qt-kicker" style="color:#9ec5ff">Technical Bid</div><h1 style="font-size:28px">${esc(q.quotationNo)}</h1><p>${esc(q.quotationDate)}</p><hr style="border-color:#344054"><p>${esc(q.customerName)}</p><p>${esc(q.person)}<br>${esc(q.department)}</p></aside>
-    <main style="padding:34px"><div class="qt-company">${esc(q.companyName)}</div><p class="qt-muted">${esc(q.address)}</p><h2 style="margin-top:30px">${esc(q.subject)}</h2>
+    <main style="padding:34px"><div class="qt-company">${esc(q.companyName)}</div><p class="qt-muted">${esc(q.address)}</p>
+    <div style="margin:18px 0"><div style="font-size:12px;font-weight:700">${esc(q.customerName)}</div><div style="font-size:11px;color:#555">Attn: ${esc(q.person)}${q.person && q.designation ? ' - ' : ''}${esc(q.designation)}</div><div style="font-size:11px;margin-top:4px">Subject:- ${esc(q.subject)}</div></div>
     <table class="qt-table"><thead><tr><th>#</th><th>Product Specification</th><th>Rate</th><th>Qty</th><th>GST</th><th>Incl.</th><th>Total</th></tr></thead><tbody>${tableRows(q.items)}</tbody></table>
     <table class="qt-total" style="margin-top:18px"><tr><td>Subtotal</td><td>${money(q.subTotal)}</td></tr><tr><td>Tax</td><td>${money(q.gstTotal)}</td></tr><tr><td><strong>Payable</strong></td><td>${money(q.grandTotal)}</td></tr></table><div class="qt-terms">Warranty and delivery terms apply as mentioned in the commercial offer.</div><div class="qt-sign">AUTHORIZED SIGNATORY</div></main>
   </div>`;
@@ -158,7 +159,7 @@ const renderPremium = (q) => `
   <style>${templateCss}</style>
   <div class="qt-page" style="padding:42px 58px;background:linear-gradient(90deg,#fff 0,#fff 94%,#0f3d2e 94%)">
     <div style="border:2px solid #c9a24d;padding:26px"><div style="display:flex;justify-content:space-between"><div><div class="qt-kicker" style="color:#b2872f">Premium Quotation</div><div class="qt-company" style="color:#0f3d2e">${esc(q.companyName)}</div><p>${esc(q.address)}</p></div><div style="text-align:right"><h2>${esc(q.quotationNo)}</h2><p>${esc(q.quotationDate)}</p></div></div>
-    <div style="background:#f8f3e6;padding:16px;margin:22px 0;display:flex;justify-content:space-between"><strong>${esc(q.subject)}</strong><span>${esc(q.person)} / ${esc(q.department)}</span></div>
+    <div style="margin:18px 0"><div style="font-size:12px;font-weight:700">${esc(q.customerName)}</div><div style="font-size:11px;color:#555">Attn: ${esc(q.person)}${q.person && q.designation ? ' - ' : ''}${esc(q.designation)}</div><div style="font-size:11px;margin-top:4px">Subject:- ${esc(q.subject)}</div></div>
     <table class="qt-table"><thead><tr><th>#</th><th>Description</th><th>Unit Rate</th><th>Qty</th><th>GST Amt</th><th>Rate + GST</th><th>Total</th></tr></thead><tbody>${tableRows(q.items)}</tbody></table>
     <table class="qt-total" style="margin-top:14px"><tr><td>Sub-Total</td><td>${money(q.subTotal)}</td></tr><tr><td>GST Amount</td><td>${money(q.gstTotal)}</td></tr><tr style="background:#0f3d2e;color:white"><td>Grand Total</td><td>${money(q.grandTotal)}</td></tr></table><div class="qt-terms">This quotation is subject to taxes, availability, and confirmed scope of work.</div><div class="qt-sign">AUTHORIZED SIGNATORY</div></div>
   </div>`;
@@ -167,15 +168,14 @@ const renderModern = (q) => `
   <style>${templateCss}</style>
   <div class="qt-page" style="padding:38px;background:#f4f8fb">
     <section style="background:#1264a3;color:white;padding:28px;border-radius:22px"><div class="qt-kicker" style="color:#b9e6fe">Quotation</div><div style="display:flex;justify-content:space-between"><h1>${esc(q.companyName)}</h1><div style="text-align:right"><h2>${esc(q.quotationNo)}</h2><p>${esc(q.quotationDate)}</p></div></div><p>${esc(q.address)}</p></section>
-    <section style="background:white;border:1px solid #d0e3f1;border-radius:18px;padding:22px;margin-top:18px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:18px"><div><div class="qt-kicker qt-muted">For Product</div><h3>${esc(q.subject)}</h3></div><div><div class="qt-kicker qt-muted">Customer</div><h3>${esc(q.customerName)}</h3><p>${esc(q.person)} - ${esc(q.designation)}</p></div></div></section>
-    <section style="background:white;border:1px solid #d0e3f1;border-radius:18px;padding:22px;margin-top:18px"><table class="qt-table"><thead><tr><th>#</th><th>Description</th><th>Unit Rate</th><th>Qty</th><th>GST Amt</th><th>Rate + GST</th><th>Total</th></tr></thead><tbody>${tableRows(q.items)}</tbody></table><table class="qt-total" style="margin-top:14px"><tr><td>Sub-Total</td><td>${money(q.subTotal)}</td></tr><tr><td>GST</td><td>${money(q.gstTotal)}</td></tr><tr><td><strong>Total</strong></td><td>${money(q.grandTotal)}</td></tr></table></section><div class="qt-sign">AUTHORIZED SIGNATORY</div>
+    <section style="background:white;border:1px solid #d0e3f1;border-radius:18px;padding:22px;margin-top:18px"><div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700">${esc(q.customerName)}</div><div style="font-size:11px;color:#555">Attn: ${esc(q.person)}${q.person && q.designation ? ' - ' : ''}${esc(q.designation)}</div><div style="font-size:11px;margin-top:4px">Subject:- ${esc(q.subject)}</div></div><table class="qt-table"><thead><tr><th>#</th><th>Description</th><th>Unit Rate</th><th>Qty</th><th>GST Amt</th><th>Rate + GST</th><th>Total</th></tr></thead><tbody>${tableRows(q.items)}</tbody></table><table class="qt-total" style="margin-top:14px"><tr><td>Sub-Total</td><td>${money(q.subTotal)}</td></tr><tr><td>GST</td><td>${money(q.gstTotal)}</td></tr><tr><td><strong>Total</strong></td><td>${money(q.grandTotal)}</td></tr></table></section><div class="qt-sign">AUTHORIZED SIGNATORY</div>
   </div>`;
 
 const renderCompact = (q) => `
   <style>${templateCss}</style>
   <div class="qt-page" style="padding:28px 42px">
     <div style="background:#111827;color:white;padding:18px 22px;display:flex;justify-content:space-between"><div><div class="qt-company" style="font-size:20px">${esc(q.companyName)}</div><div class="qt-muted" style="color:#cbd5e1">${esc(q.address)}</div></div><div style="text-align:right"><strong>${esc(q.quotationNo)}</strong><br>${esc(q.quotationDate)}</div></div>
-    <div style="display:flex;justify-content:space-between;margin:18px 0;font-size:12px"><div><strong>Subject:</strong> ${esc(q.subject)}</div><div><strong>Attention:</strong> ${esc(q.person)} - ${esc(q.designation)}</div></div>
+    <div style="margin:16px 0"><div style="font-size:12px;font-weight:700">${esc(q.customerName)}</div><div style="font-size:11px;color:#555">Attn: ${esc(q.person)}${q.person && q.designation ? ' - ' : ''}${esc(q.designation)}</div><div style="font-size:11px;margin-top:4px">Subject:- ${esc(q.subject)}</div></div>
     <table class="qt-table"><thead><tr><th>#</th><th>Description</th><th>Rate</th><th>Qty</th><th>GST</th><th>Incl.</th><th>Total</th></tr></thead><tbody>${tableRows(q.items)}</tbody></table>
     <table class="qt-total" style="margin-top:10px"><tr><td>Sub-Total</td><td>${money(q.subTotal)}</td></tr><tr><td>GST</td><td>${money(q.gstTotal)}</td></tr><tr><td><strong>Grand Total</strong></td><td>${money(q.grandTotal)}</td></tr></table><div class="qt-terms">Quoted prices are valid for 30 days. Installation/cabling scope must be confirmed before execution. Warranty as per manufacturer policy.</div><div class="qt-sign">AUTHORIZED SIGNATORY</div>
   </div>`;

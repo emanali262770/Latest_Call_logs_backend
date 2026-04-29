@@ -64,8 +64,18 @@ const ensureDirectory = async (directory = quotationPdfDirectory) => {
 };
 
 const v = (value, fallback = "-") => {
+  if (typeof value === "object" && value !== null) return fallback;
   const s = String(value ?? "").trim();
   return s || fallback;
+};
+
+const firstText = (...values) => {
+  for (const value of values) {
+    if (typeof value === "object" && value !== null) continue;
+    const text = String(value ?? "").trim();
+    if (text) return text;
+  }
+  return "";
 };
 
 const formatMoney = (value) => {
@@ -83,6 +93,12 @@ const formatDate = (value, options = { day: "2-digit", month: "short", year: "nu
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleDateString("en-GB", options);
+};
+
+const formatQty = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return v(value);
+  return Number.isInteger(n) ? String(n) : formatMoney(n);
 };
 
 const fetchImageBuffer = (url) =>
@@ -185,10 +201,13 @@ const normalizeQuotation = (quotation) => {
     revisionId: v(quotation?.revisionId || quotation?.revision_id),
     quotationDate: quotation?.quotationDate || quotation?.quotation_date || quotation?.date,
     customerName: v(
-      quotation?.company ||
-        quotation?.customerName ||
-        quotation?.customer_name ||
-        quotation?.customer?.company
+      firstText(
+        quotation?.customerName,
+        quotation?.customer_name,
+        quotation?.customerCompany,
+        quotation?.customer?.company,
+        quotation?.company
+      )
     ),
     person: v(quotation?.person || quotation?.customerPerson || quotation?.customer_person),
     designation: v(
@@ -202,11 +221,7 @@ const normalizeQuotation = (quotation) => {
         quotation?.service_name ||
         quotation?.service?.serviceName
     ),
-    department: v(
-      quotation?.department ||
-        quotation?.customerDepartment ||
-        quotation?.customer_department
-    ),
+    department: v(quotation?.department || quotation?.customerDepartment || quotation?.customer_department),
     taxMode: v(quotation?.taxMode || quotation?.tax_mode),
     printTemplate: isValidQuotationTemplate(quotation?.printTemplate || quotation?.print_template)
       ? quotation?.printTemplate || quotation?.print_template
@@ -263,20 +278,10 @@ const drawHeader = (doc, quotation) => {
     });
 
   doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor(COLORS.softest)
-    .text("QUOTATION", rightBlockX, topY + 2, {
-      width: rightBlockWidth,
-      align: "right",
-      characterSpacing: 2.2,
-    });
-
-  doc
     .font("Courier-Bold")
     .fontSize(13)
     .fillColor(COLORS.text)
-    .text(v(quotation.quotationNo), rightBlockX, topY + 16, {
+    .text(v(quotation.quotationNo), rightBlockX, topY + 8, {
       width: rightBlockWidth,
       align: "right",
       lineBreak: false,
@@ -289,7 +294,7 @@ const drawHeader = (doc, quotation) => {
     .text(
       formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }),
       rightBlockX,
-      topY + 33,
+      topY + 25,
       {
         width: rightBlockWidth,
         align: "right",
@@ -299,7 +304,7 @@ const drawHeader = (doc, quotation) => {
 
   doc
     .moveTo(contentX, 82)
-    .lineTo(PAGE.right - mm(16), 82)
+    .lineTo(PAGE.right, 82)
     .lineWidth(1)
     .strokeColor(COLORS.border)
     .stroke();
@@ -373,10 +378,47 @@ const drawSectionHeader = (doc, label, y) => {
   const lineStart = x + 108;
   doc
     .moveTo(lineStart, y + 4)
-    .lineTo(PAGE.right - mm(16), y + 4)
+    .lineTo(PAGE.right, y + 4)
     .lineWidth(0.75)
     .strokeColor(COLORS.border)
     .stroke();
+};
+
+const drawClientSubject = (doc, quotation, startY, options = {}) => {
+  const x = options.x ?? mm(16);
+  const width = options.width ?? PAGE.width - mm(32);
+  const textColor = options.color ?? COLORS.text;
+  const mutedColor = options.mutedColor ?? COLORS.muted;
+  let y = startY;
+
+  if (quotation.customerName !== "-") {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(options.customerFontSize ?? 9.5)
+      .fillColor(textColor)
+      .text(quotation.customerName, x, y, { width });
+    y += 13;
+  }
+
+  const attentionText =
+    quotation.person !== "-"
+      ? `Attn: ${quotation.person}${quotation.designation !== "-" ? ` - ${quotation.designation}` : ""}`
+      : "Attn: -";
+
+  doc
+    .font("Helvetica")
+    .fontSize(options.detailFontSize ?? 8.5)
+    .fillColor(textColor)
+    .text(attentionText, x, y, { width });
+  y += options.attentionGap ?? 18;
+
+  doc
+    .font("Helvetica")
+    .fontSize(options.subjectFontSize ?? 9)
+    .fillColor(textColor)
+    .text(`Subject:- Quotation for ${v(quotation.serviceName)}`, x, y, { width });
+
+  return y + (options.bottomGap ?? 18);
 };
 
 const getCompactLevel = (itemCount) => {
@@ -447,6 +489,17 @@ const TABLE_STYLES = {
   },
 };
 
+const getBodyLayout = (template = "default") => {
+  const layouts = {
+    default: { x: mm(16), width: PAGE.width - mm(32), tableGap: 6, termsGap: 8 },
+    technical_bid: { x: mm(16), width: PAGE.width - mm(32), tableGap: 8, termsGap: 10 },
+    modern_clean: { x: mm(16), width: PAGE.width - mm(32), tableGap: 10, termsGap: 12 },
+    premium_tax: { x: mm(16), width: PAGE.width - mm(32), tableGap: 12, termsGap: 12 },
+    compact_commercial: { x: mm(16), width: PAGE.width - mm(32), tableGap: 4, termsGap: 6 },
+  };
+  return layouts[template] || layouts.default;
+};
+
 const drawItemDescriptionCell = (doc, item, x, y, width, compactLevel = 0) => {
   const cp = COMPACT_PARAMS[compactLevel];
   const { paddingX, paddingY, imageSize, imageGap, nameFontSize, descFontSize } = cp;
@@ -506,29 +559,33 @@ const drawItemsTable = (doc, quotation, y) => {
   const isWithTax = isWithTaxMode(quotation);
   const template = quotation.printTemplate || "default";
   const style = TABLE_STYLES[template] || TABLE_STYLES.default;
+  const layout = getBodyLayout(template);
   const items = quotation.items || [];
   const compactLevel = getCompactLevel(items.length);
-  const x = mm(16);
-  const tableWidth = PAGE.width - mm(32);
+  const x = layout.x;
+  const tableWidth = layout.width;
   const headerHeight = compactLevel === 2 ? 13 : compactLevel === 1 ? 16 : 22;
 
   const columns = isWithTax
     ? [
-        { key: "sr", label: "#", width: 22.7, align: "center" },
-        { key: "description", label: "Description", width: 165, align: "left" },
-        { key: "rate", label: "Unit Rate", width: 73.7, align: "right" },
-        { key: "qty", label: "Qty", width: 36.9, align: "right" },
-        { key: "gstAmount", label: "GST Amt", width: 62.4, align: "right" },
-        { key: "rateWithGst", label: "Rate + GST", width: 73.7, align: "right" },
-        { key: "totalWithGst", label: "Total", width: 70.18, align: "right" },
+        { key: "sr", label: "Sr", width: 22, align: "center" },
+        { key: "description", label: "Item", width: 166, align: "left" },
+        { key: "rate", label: "Rate", width: 62, align: "right" },
+        { key: "qty", label: "Qty", width: 35, align: "right" },
+        { key: "amount", label: "Total", width: 68, align: "right" },
+        { key: "rateWithGst", label: "18% GST Rate", width: 74, align: "right" },
+        { key: "totalWithGst", label: "Total Amount\nWith GST", width: 0, align: "right" },
       ]
     : [
-        { key: "sr", label: "#", width: 22.7, align: "center" },
-        { key: "description", label: "Description", width: 279, align: "left" },
-        { key: "rate", label: "Unit Rate", width: 73.7, align: "right" },
-        { key: "qty", label: "Qty", width: 36.9, align: "right" },
-        { key: "amount", label: "Total", width: 92.28, align: "right" },
+        { key: "sr", label: "Sr", width: 22, align: "center" },
+        { key: "description", label: "Item", width: 272, align: "left" },
+        { key: "rate", label: "Rate", width: 78, align: "right" },
+        { key: "qty", label: "Qty", width: 42, align: "right" },
+        { key: "amount", label: "Total", width: 0, align: "right" },
       ];
+
+  const fixedWidth = columns.slice(0, -1).reduce((sum, col) => sum + col.width, 0);
+  columns[columns.length - 1].width = tableWidth - fixedWidth;
 
   doc.rect(x, y, tableWidth, headerHeight).fill(style.headerFill);
   doc.rect(x, y, tableWidth, headerHeight).lineWidth(0.75).strokeColor(style.headerStroke).stroke();
@@ -609,7 +666,7 @@ const drawItemsTable = (doc, quotation, y) => {
         let value = "";
         if (col.key === "sr") value = String(index + 1);
         if (col.key === "rate") value = formatMoney(item.rate);
-        if (col.key === "qty") value = formatMoney(item.qty);
+        if (col.key === "qty") value = formatQty(item.qty);
         if (col.key === "gstAmount") value = formatMoney(item.gstAmount);
         if (col.key === "rateWithGst") value = formatMoney(item.rateWithGst);
         if (col.key === "totalWithGst") value = formatMoney(item.totalWithGst);
@@ -645,11 +702,12 @@ const drawTotals = (doc, quotation, startY) => {
   const isWithTax = isWithTaxMode(quotation);
   const template = quotation.printTemplate || "default";
   const style = TABLE_STYLES[template] || TABLE_STYLES.default;
+  const layout = getBodyLayout(template);
   const boxWidth = mm(72);
-  const tableRightX = mm(16) + (PAGE.width - mm(32));
+  const tableRightX = layout.x + layout.width;
   const boxX = tableRightX - boxWidth;
   const rowHeight = 14;
-  let y = startY + 8;
+  let y = startY + 2;
 
   const rows = [];
   if (isWithTax) {
@@ -660,7 +718,7 @@ const drawTotals = (doc, quotation, startY) => {
     ]);
     rows.push([
       "GST Amount (PKR)",
-      formatMoney(quotation.items.reduce((s, i) => s + Number(i.gstAmount || 0), 0)),
+      formatMoney(quotation.items.reduce((s, i) => s + (Number(i.totalWithGst || 0) - Number(i.amount || 0)), 0)),
       false,
     ]);
   }
@@ -713,7 +771,7 @@ const drawTotals = (doc, quotation, startY) => {
     y += h;
   });
 
-  return startY + 8 + totalHeight;
+  return y + 2;
 };
 
 const drawTerms = (doc, startY) => {
@@ -759,7 +817,7 @@ const drawFooter = (doc, endY) => {
   const y = Math.min(endY + 6, 774);
   const x = mm(16);
   const signWidth = mm(55);
-  const signX = PAGE.right - mm(16) - signWidth;
+  const signX = PAGE.right - signWidth;
 
   doc
     .font("Helvetica-Oblique")
@@ -820,19 +878,10 @@ const drawModernHeader = (doc, quotation) => {
     .fillColor("#d8ecff")
     .text(STATIC_COMPANY_PROFILE.address, x + 18, y + 43, { width: 260 });
   doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor("#d8ecff")
-    .text("QUOTATION", x + width - 160, y + 15, {
-      width: 140,
-      align: "right",
-      characterSpacing: 2,
-    });
-  doc
     .font("Courier-Bold")
     .fontSize(13)
     .fillColor(COLORS.white)
-    .text(v(quotation.quotationNo), x + width - 160, y + 31, {
+    .text(v(quotation.quotationNo), x + width - 160, y + 22, {
       width: 140,
       align: "right",
     });
@@ -840,12 +889,12 @@ const drawModernHeader = (doc, quotation) => {
     .font("Helvetica")
     .fontSize(8)
     .fillColor("#d8ecff")
-    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 48, {
+    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 40, {
       width: 140,
       align: "right",
     });
 
-  return drawSubjectAttention(doc, quotation, 122);
+  return drawClientSubject(doc, quotation, 118, { x: mm(18), width: PAGE.width - mm(36), bottomGap: 16 });
 };
 
 const drawTechnicalHeader = (doc, quotation) => {
@@ -860,20 +909,15 @@ const drawTechnicalHeader = (doc, quotation) => {
   doc.rect(x, y, width, 74).lineWidth(0.9).strokeColor("#c7d0dd").stroke();
   doc.rect(x, y, 150, 74).fill(navy);
   doc
-    .font("Helvetica-Bold")
-    .fontSize(6.8)
-    .fillColor("#9db7ef")
-    .text("TECHNICAL BID", x + 16, y + 15, { characterSpacing: 2.2 });
-  doc
     .font("Courier-Bold")
     .fontSize(12.5)
     .fillColor(COLORS.white)
-    .text(v(quotation.quotationNo), x + 16, y + 33, { width: 120 });
+    .text(v(quotation.quotationNo), x + 16, y + 22, { width: 120 });
   doc
     .font("Helvetica")
     .fontSize(7)
     .fillColor("#cbd5e1")
-    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + 16, y + 52, {
+    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + 16, y + 42, {
       width: 120,
     });
   doc
@@ -889,15 +933,7 @@ const drawTechnicalHeader = (doc, quotation) => {
       width: 245,
       lineGap: 2,
     });
-  doc
-    .font("Helvetica")
-    .fontSize(6.7)
-    .fillColor("#667085")
-    .text("Commercial proposal prepared for review and approval", x + 174, y + 54, {
-      width: 245,
-    });
-
-  return drawSubjectAttention(doc, quotation, 124);
+  return drawClientSubject(doc, quotation, 118, { x: mm(18), width: PAGE.width - mm(36), bottomGap: 14 });
 };
 
 const drawPremiumHeader = (doc, quotation) => {
@@ -914,28 +950,14 @@ const drawPremiumHeader = (doc, quotation) => {
     .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x, topY, { width: 280 });
   doc
     .font("Helvetica")
-    .fontSize(7)
-    .fillColor("#9a7a25")
-    .text("PREMIUM COMMERCIAL OFFER", x, topY + 21, { characterSpacing: 1.6 });
-  doc
-    .font("Helvetica")
     .fontSize(8)
     .fillColor(COLORS.muted)
-    .text(STATIC_COMPANY_PROFILE.address, x, topY + 34, { width: 260 });
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor("#9a7a25")
-    .text("QUOTATION", rightBlockX, topY + 2, {
-      width: 158,
-      align: "right",
-      characterSpacing: 2.2,
-    });
+    .text(STATIC_COMPANY_PROFILE.address, x, topY + 26, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(13)
     .fillColor("#0f3d2e")
-    .text(v(quotation.quotationNo), rightBlockX, topY + 16, {
+    .text(v(quotation.quotationNo), rightBlockX, topY + 8, {
       width: 158,
       align: "right",
     });
@@ -943,13 +965,13 @@ const drawPremiumHeader = (doc, quotation) => {
     .font("Helvetica")
     .fontSize(8)
     .fillColor(COLORS.muted)
-    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), rightBlockX, topY + 33, {
+    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), rightBlockX, topY + 25, {
       width: 158,
       align: "right",
     });
-  doc.moveTo(x, 86).lineTo(PAGE.right - mm(16), 86).lineWidth(1.2).strokeColor("#c9a24d").stroke();
+  doc.moveTo(x, 86).lineTo(PAGE.right, 86).lineWidth(1.2).strokeColor("#c9a24d").stroke();
 
-  return drawSubjectAttention(doc, quotation, 112);
+  return drawClientSubject(doc, quotation, 106, { x: mm(22), width: PAGE.width - mm(44), bottomGap: 18 });
 };
 
 const drawCompactHeader = (doc, quotation) => {
@@ -982,7 +1004,16 @@ const drawCompactHeader = (doc, quotation) => {
       align: "right",
     });
 
-  return drawSubjectAttention(doc, quotation, 94);
+  return drawClientSubject(doc, quotation, 88, {
+    x: mm(16),
+    width: PAGE.width - mm(32),
+    customerFontSize: 8.5,
+    detailFontSize: 7.5,
+    subjectFontSize: 8,
+    departmentGap: 13,
+    attentionGap: 15,
+    bottomGap: 12,
+  });
 };
 
 const drawTemplateIntro = (doc, quotation) => {
@@ -993,7 +1024,7 @@ const drawTemplateIntro = (doc, quotation) => {
 
   drawTopAccent(doc);
   drawHeader(doc, quotation);
-  return drawSubjectAttention(doc, quotation, 110);
+  return drawClientSubject(doc, quotation, 102, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 16 });
 };
 
 const previewQuotation = {
@@ -1082,10 +1113,10 @@ export const generateQuotationPdf = async (quotationInput, options = {}) => {
 
   doc.rect(0, 0, PAGE.width, PAGE.height).fill(COLORS.white);
   const afterSubjectY = drawTemplateIntro(doc, quotation);
-  drawSectionHeader(doc, "Commercial Offer", afterSubjectY + 4);
-  const tableEndY = drawItemsTable(doc, quotation, afterSubjectY + 20);
+  const layout = getBodyLayout(quotation.printTemplate);
+  const tableEndY = drawItemsTable(doc, quotation, afterSubjectY + layout.tableGap);
   const totalsEndY = drawTotals(doc, quotation, tableEndY);
-  const termsEndY = drawTerms(doc, totalsEndY + 8);
+  const termsEndY = drawTerms(doc, totalsEndY + layout.termsGap);
   drawFooter(doc, termsEndY + 2);
 
   doc.end();
@@ -1108,24 +1139,21 @@ export const ensureQuotationTemplatePreviewPdfs = async () => {
       const filePath = path.join(quotationPreviewPdfDirectory, fileName);
       const publicUrl = `/uploads/quotation-template-previews/${fileName}`;
 
-      const exists = fs.existsSync(filePath);
-      if (!exists) {
-        try {
-          await generateQuotationPdf(
-            {
-              ...previewQuotation,
-              printTemplate: template.id,
-            },
-            {
-              outputDirectory: quotationPreviewPdfDirectory,
-              fileName,
-              publicUrl,
-            }
-          );
-        } catch (error) {
-          console.error(`Failed to generate preview PDF for template "${template.id}":`, error);
-          return { id: template.id, previewPdfUrl: null };
-        }
+      try {
+        await generateQuotationPdf(
+          {
+            ...previewQuotation,
+            printTemplate: template.id,
+          },
+          {
+            outputDirectory: quotationPreviewPdfDirectory,
+            fileName,
+            publicUrl,
+          }
+        );
+      } catch (error) {
+        console.error(`Failed to generate preview PDF for template "${template.id}":`, error);
+        return { id: template.id, previewPdfUrl: null };
       }
 
       return {

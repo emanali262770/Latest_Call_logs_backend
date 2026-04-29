@@ -143,7 +143,7 @@ const normalizeEstimation = (input) => {
         const discountPercent = Number(item?.discountPercent ?? item?.discount_percent ?? 0);
         const discountAmount = Number(item?.discountAmount ?? item?.discount_amount ?? 0);
         const finalTotal = Number(item?.finalTotal ?? item?.final_total ?? 0);
-        const taxAmount = salePriceWithTax - salePrice;
+        const taxAmount = saleTotalWithTax - saleTotal;
 
         return {
           itemName: v(item?.itemName || item?.item_name),
@@ -239,20 +239,10 @@ const drawHeader = (doc, estimation) => {
     });
 
   doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor(COLORS.softest)
-    .text("ESTIMATION", rightBlockX, topY + 2, {
-      width: rightBlockWidth,
-      align: "right",
-      characterSpacing: 2.2,
-    });
-
-  doc
     .font("Courier-Bold")
     .fontSize(13)
     .fillColor(COLORS.text)
-    .text(v(estimation.estimateId), rightBlockX, topY + 16, {
+    .text(v(estimation.estimateId), rightBlockX, topY + 8, {
       width: rightBlockWidth,
       align: "right",
       lineBreak: false,
@@ -275,68 +265,47 @@ const drawHeader = (doc, estimation) => {
 
   doc
     .moveTo(contentX, 82)
-    .lineTo(PAGE.right - mm(16), 82)
+    .lineTo(PAGE.right, 82)
     .lineWidth(1)
     .strokeColor(COLORS.border)
     .stroke();
 };
 
-const drawSubjectAttention = (doc, estimation, startY) => {
-  const x = mm(16);
-  const totalWidth = PAGE.width - mm(32);
-  const blockWidth = (totalWidth - 10) / 2;
-  const dividerX = x + blockWidth + 5;
-
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor(COLORS.soft)
-    .text("SUBJECT", x, startY, { characterSpacing: 1.6 });
-
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(9.5)
-    .fillColor(COLORS.text)
-    .text(`Estimation for ${v(estimation.serviceName)}`, x, startY + 11, {
-      width: blockWidth - 14,
-    });
-
-  doc
-    .moveTo(dividerX, startY - 14)
-    .lineTo(dividerX, startY + 50)
-    .lineWidth(0.75)
-    .strokeColor(COLORS.border)
-    .stroke();
-
-  const attnX = dividerX + 10;
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor(COLORS.soft)
-    .text("ATTENTION", attnX, startY, { characterSpacing: 1.6 });
+const drawClientSubject = (doc, estimation, startY, options = {}) => {
+  const x = options.x ?? mm(16);
+  const width = options.width ?? PAGE.width - mm(32);
+  const textColor = options.color ?? COLORS.text;
+  const mutedColor = options.mutedColor ?? COLORS.muted;
+  let y = startY;
 
   if (estimation.customerName !== "-") {
     doc
       .font("Helvetica-Bold")
-      .fontSize(8.5)
-      .fillColor(COLORS.text)
-      .text(estimation.customerName, attnX, startY + 11, { width: blockWidth - 10 });
+      .fontSize(options.customerFontSize ?? 9.5)
+      .fillColor(textColor)
+      .text(estimation.customerName, x, y, { width });
+    y += 13;
   }
 
-  if (estimation.person !== "-") {
-    const line =
-      estimation.designation !== "-"
-        ? `${estimation.person} — ${estimation.designation}`
-        : estimation.person;
+  const attentionText =
+    estimation.person !== "-"
+      ? `Attn: ${estimation.person}${estimation.designation !== "-" ? ` - ${estimation.designation}` : ""}`
+      : "Attn: -";
 
-    doc
-      .font("Helvetica")
-      .fontSize(8)
-      .fillColor(COLORS.muted)
-      .text(line, attnX, startY + 24, { width: blockWidth - 10 });
-  }
+  doc
+    .font("Helvetica")
+    .fontSize(options.detailFontSize ?? 8.5)
+    .fillColor(mutedColor)
+    .text(attentionText, x, y, { width });
+  y += options.attentionGap ?? 18;
 
-  return startY + 50;
+  doc
+    .font("Helvetica")
+    .fontSize(options.subjectFontSize ?? 9)
+    .fillColor(textColor)
+    .text(`Subject:- Estimation for ${v(estimation.serviceName)}`, x, y, { width });
+
+  return y + (options.bottomGap ?? 18);
 };
 
 const drawSectionHeader = (doc, label, y) => {
@@ -351,7 +320,7 @@ const drawSectionHeader = (doc, label, y) => {
   const lineStart = x + 108;
   doc
     .moveTo(lineStart, y + 4)
-    .lineTo(PAGE.right - mm(16), y + 4)
+    .lineTo(PAGE.right, y + 4)
     .lineWidth(0.75)
     .strokeColor(COLORS.border)
     .stroke();
@@ -499,7 +468,7 @@ const TABLE_STYLES = {
 };
 
 const drawItemsTable = (doc, estimation, y) => {
-  const { anyDiscount, isWithTax, items } = estimation;
+  const { isWithTax, anyDiscount, items } = estimation;
   const template = estimation.printTemplate || "default";
   const style = TABLE_STYLES[template] || TABLE_STYLES.default;
   const compactLevel = getCompactLevel(items.length);
@@ -511,17 +480,25 @@ const drawItemsTable = (doc, estimation, y) => {
   const bodyStroke = style.bodyStroke;
   const headerText = style.headerText;
 
-  const itemColWidth = anyDiscount ? 172 : 210;
-
-  const columns = [
-    { key: "sr", label: "#", width: 22, align: "center" },
-    { key: "item", label: "Item / Description", width: itemColWidth, align: "left" },
-    { key: "qty", label: "Qty", width: 35, align: "right" },
-    { key: "salePrice", label: isWithTax ? "Unit Price (w/ Tax)" : "Unit Price", width: 85, align: "right" },
-    ...(isWithTax ? [{ key: "taxAmt", label: "Tax Amt", width: 55, align: "right" }] : []),
-    ...(anyDiscount ? [{ key: "discAmt", label: "Disc Amt", width: 60, align: "right" }] : []),
-    { key: "total", label: "Final Total", width: 0, align: "right" },
-  ];
+  const columns = isWithTax
+    ? [
+        { key: "sr", label: "Sr", width: 22, align: "center" },
+        { key: "description", label: "Item", width: anyDiscount ? 140 : 166, align: "left" },
+        { key: "rate", label: "Rate", width: 55, align: "right" },
+        { key: "qty", label: "Qty", width: 32, align: "right" },
+        { key: "gstAmount", label: "GST Amt", width: 52, align: "right" },
+        { key: "rateWithGst", label: "Rate + GST", width: 68, align: "right" },
+        ...(anyDiscount ? [{ key: "discAmt", label: "Disc Amt", width: 55, align: "right" }] : []),
+        { key: "totalWithGst", label: "Total Amount\nWith GST", width: 0, align: "right" },
+      ]
+    : [
+        { key: "sr", label: "Sr", width: 22, align: "center" },
+        { key: "description", label: "Item", width: anyDiscount ? 210 : 272, align: "left" },
+        { key: "rate", label: "Rate", width: 68, align: "right" },
+        { key: "qty", label: "Qty", width: 38, align: "right" },
+        ...(anyDiscount ? [{ key: "discAmt", label: "Disc Amt", width: 62, align: "right" }] : []),
+        { key: "amount", label: "Total", width: 0, align: "right" },
+      ];
 
   const fixedWidth = columns.slice(0, -1).reduce((sum, col) => sum + col.width, 0);
   columns[columns.length - 1].width = tableWidth - fixedWidth;
@@ -583,7 +560,7 @@ const drawItemsTable = (doc, estimation, y) => {
   }
 
   items.forEach((item, index) => {
-    const itemColumn = columns.find((col) => col.key === "item");
+    const itemColumn = columns.find((col) => col.key === "description");
     const rowHeight = getDescriptionHeight(doc, item, itemColumn.width, compactLevel);
 
     if (index % 2 === 1) {
@@ -603,7 +580,7 @@ const drawItemsTable = (doc, estimation, y) => {
           .stroke();
       }
 
-      if (col.key === "item") {
+      if (col.key === "description") {
         drawDescriptionCell(doc, item, currentX, rowY, col.width, compactLevel);
       } else {
         let value = "";
@@ -618,24 +595,32 @@ const drawItemsTable = (doc, estimation, y) => {
             fontSize = compactLevel === 2 ? 4.5 : compactLevel === 1 ? 5.5 : 6.4;
             color = "#999999";
             break;
+          case "rate":
+            value = formatMoney(item.salePrice);
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
+            break;
           case "qty":
             value = formatMoney(item.qty);
             fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
-          case "salePrice":
-            value = isWithTax ? formatMoney(item.salePriceWithTax) : formatMoney(item.salePrice);
-            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
-            break;
-          case "taxAmt":
+          case "gstAmount":
             value = formatMoney(item.taxAmount);
             fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
-          case "discAmt":
-            value = item.hasDiscount ? formatMoney(item.discountAmount) : "0.00";
+          case "rateWithGst":
+            value = formatMoney(item.salePriceWithTax);
             fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
-          case "total":
+          case "discAmt":
+            value = formatMoney(item.discountAmount);
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
+            break;
+          case "totalWithGst":
             value = formatMoney(item.finalTotal);
+            fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
+            break;
+          case "amount":
+            value = formatMoney(item.saleTotal);
             fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
         }
@@ -662,7 +647,7 @@ const drawItemsTable = (doc, estimation, y) => {
 };
 
 const drawTotals = (doc, estimation, startY) => {
-  const { anyDiscount, isWithTax, subTotal, taxTotal, discountTotal, grandTotal } = estimation;
+  const { isWithTax, anyDiscount, grandTotal, items } = estimation;
   const template = estimation.printTemplate || "default";
   const style = TABLE_STYLES[template] || TABLE_STYLES.default;
   const boxWidth = mm(72);
@@ -671,21 +656,30 @@ const drawTotals = (doc, estimation, startY) => {
   const rowHeight = 14;
   let y = startY + 2;
 
-  const rows = [
-    ["Sub Total (PKR)", formatMoney(subTotal), false],
-    ...(isWithTax ? [["Tax Total (PKR)", formatMoney(taxTotal), false]] : []),
-    ...(anyDiscount ? [["Total Discount (PKR)", formatMoney(discountTotal), false]] : []),
-    ["Grand Total (PKR)", formatMoney(grandTotal), true],
-  ];
+  const subTotal = items.reduce((s, i) => s + Number(i.saleTotal || 0), 0);
+  const subTotalWithTax = items.reduce((s, i) => s + Number(i.saleTotalWithTax || 0), 0);
+  const discountTotal = items.reduce((s, i) => s + Number(i.discountAmount || 0), 0);
+  const gstTotal = items.reduce((s, i) => s + Number(i.taxAmount || 0), 0);
+
+  const rows = [];
+  if (isWithTax) {
+    rows.push(["Sub-Total (PKR)", formatMoney(subTotal), false]);
+    rows.push(["GST Amount (PKR)", formatMoney(gstTotal), false]);
+  } else {
+    rows.push(["Sub-Total (PKR)", formatMoney(subTotal), false]);
+  }
+  if (anyDiscount && discountTotal > 0) {
+    rows.push(["Discount (PKR)", `- ${formatMoney(discountTotal)}`, false, true]);
+  }
+  rows.push(["Grand Total (PKR)", formatMoney(grandTotal), true]);
 
   const totalHeight = rows.reduce((sum, row) => sum + (row[2] ? 17 : rowHeight), 0);
   doc.rect(boxX, y, boxWidth, totalHeight).lineWidth(0.75).strokeColor(style.headerStroke).stroke();
 
-  rows.forEach(([label, value, grand], index) => {
-    const height = grand ? 17 : rowHeight;
-
+  rows.forEach(([label, value, grand, isDiscount], index) => {
+    const h = grand ? 17 : rowHeight;
     if (grand) {
-      doc.rect(boxX, y, boxWidth, height).fill(style.headerFill);
+      doc.rect(boxX, y, boxWidth, h).fill(style.headerFill);
       doc
         .moveTo(boxX, y)
         .lineTo(boxX + boxWidth, y)
@@ -701,35 +695,39 @@ const drawTotals = (doc, estimation, startY) => {
         .stroke();
     }
 
+    const labelFontSize = grand ? 6.6 : 7.0;
+    const valueFontSize = grand ? 7.4 : 8.5;
+    const topPad = (h - valueFontSize) / 2;
+
     doc
       .font(grand ? "Helvetica-Bold" : "Helvetica")
-      .fontSize(grand ? 6.2 : 5.8)
+      .fontSize(labelFontSize)
       .fillColor(grand ? style.headerText : COLORS.soft)
-      .text(String(label).toUpperCase(), boxX + 8, y + (grand ? 5.5 : 4.5), {
-        width: 110,
-        characterSpacing: grand ? 0.7 : 0.4,
+      .text(String(label).toUpperCase(), boxX + 5, y + topPad, {
+        width: (boxWidth / 2) - 8,
+        characterSpacing: grand ? 0.6 : 0.3,
       });
 
     doc
       .font(grand ? "Courier-Bold" : "Courier")
-      .fontSize(grand ? 7.4 : 6.5)
-      .fillColor(grand ? style.headerText : COLORS.text)
-      .text(value, boxX + 118, y + (grand ? 5 : 4.5), {
-        width: boxWidth - 127,
+      .fontSize(valueFontSize)
+      .fillColor(isDiscount ? "#c0392b" : grand ? style.headerText : COLORS.text)
+      .text(value, boxX + 5, y + topPad, {
+        width: boxWidth - 10,
         align: "right",
       });
 
-    y += height;
+    y += h;
   });
 
-  return startY + 4 + totalHeight;
+  return y + 2;
 };
 
 const drawFooter = (doc, endY) => {
   const y = Math.min(endY + 8, 774);
   const x = mm(16);
   const signWidth = mm(55);
-  const signX = PAGE.right - mm(16) - signWidth;
+  const signX = PAGE.right - signWidth;
 
   doc
     .font("Helvetica-Oblique")
@@ -785,15 +783,10 @@ const drawTechnicalHeader = (doc, estimation) => {
   doc.rect(x, y, width, 74).lineWidth(0.9).strokeColor("#c7d0dd").stroke();
   doc.rect(x, y, 150, 74).fill(navy);
   doc
-    .font("Helvetica-Bold")
-    .fontSize(6.8)
-    .fillColor("#9db7ef")
-    .text("TECHNICAL BID", x + 16, y + 15, { characterSpacing: 2.2 });
-  doc
     .font("Courier-Bold")
     .fontSize(12.5)
     .fillColor(COLORS.white)
-    .text(v(estimation.estimateId), x + 16, y + 33, { width: 120 });
+    .text(v(estimation.estimateId), x + 16, y + 26, { width: 120 });
   doc
     .font("Helvetica")
     .fontSize(7)
@@ -822,7 +815,7 @@ const drawTechnicalHeader = (doc, estimation) => {
       width: 245,
     });
 
-  return drawSubjectAttention(doc, estimation, 124);
+  return drawClientSubject(doc, estimation, 124);
 };
 
 const drawModernHeader = (doc, estimation) => {
@@ -842,19 +835,10 @@ const drawModernHeader = (doc, estimation) => {
     .fillColor("#d8ecff")
     .text(STATIC_COMPANY_PROFILE.address, x + 18, y + 43, { width: 260 });
   doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor("#d8ecff")
-    .text("ESTIMATION", x + width - 160, y + 15, {
-      width: 140,
-      align: "right",
-      characterSpacing: 2,
-    });
-  doc
     .font("Courier-Bold")
     .fontSize(13)
     .fillColor(COLORS.white)
-    .text(v(estimation.estimateId), x + width - 160, y + 31, {
+    .text(v(estimation.estimateId), x + width - 160, y + 22, {
       width: 140,
       align: "right",
     });
@@ -862,12 +846,12 @@ const drawModernHeader = (doc, estimation) => {
     .font("Helvetica")
     .fontSize(8)
     .fillColor("#d8ecff")
-    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 48, {
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 40, {
       width: 140,
       align: "right",
     });
 
-  return drawSubjectAttention(doc, estimation, 122);
+  return drawClientSubject(doc, estimation, 122);
 };
 
 const drawPremiumHeader = (doc, estimation) => {
@@ -884,28 +868,14 @@ const drawPremiumHeader = (doc, estimation) => {
     .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x, topY, { width: 280 });
   doc
     .font("Helvetica")
-    .fontSize(7)
-    .fillColor("#9a7a25")
-    .text("PREMIUM ESTIMATION", x, topY + 21, { characterSpacing: 1.6 });
-  doc
-    .font("Helvetica")
     .fontSize(8)
     .fillColor(COLORS.muted)
-    .text(STATIC_COMPANY_PROFILE.address, x, topY + 34, { width: 260 });
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(6.5)
-    .fillColor("#9a7a25")
-    .text("ESTIMATION", rightBlockX, topY + 2, {
-      width: 158,
-      align: "right",
-      characterSpacing: 2.2,
-    });
+    .text(STATIC_COMPANY_PROFILE.address, x, topY + 21, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(13)
     .fillColor("#0f3d2e")
-    .text(v(estimation.estimateId), rightBlockX, topY + 16, {
+    .text(v(estimation.estimateId), rightBlockX, topY + 8, {
       width: 158,
       align: "right",
     });
@@ -913,13 +883,13 @@ const drawPremiumHeader = (doc, estimation) => {
     .font("Helvetica")
     .fontSize(8)
     .fillColor(COLORS.muted)
-    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), rightBlockX, topY + 33, {
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), rightBlockX, topY + 25, {
       width: 158,
       align: "right",
     });
-  doc.moveTo(x, 86).lineTo(PAGE.right - mm(16), 86).lineWidth(1.2).strokeColor("#c9a24d").stroke();
+  doc.moveTo(x, 86).lineTo(PAGE.right, 86).lineWidth(1.2).strokeColor("#c9a24d").stroke();
 
-  return drawSubjectAttention(doc, estimation, 112);
+  return drawClientSubject(doc, estimation, 106, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 18 });
 };
 
 const drawCompactHeader = (doc, estimation) => {
@@ -952,7 +922,15 @@ const drawCompactHeader = (doc, estimation) => {
       align: "right",
     });
 
-  return drawSubjectAttention(doc, estimation, 94);
+  return drawClientSubject(doc, estimation, 88, {
+    x: mm(16),
+    width: PAGE.width - mm(32),
+    customerFontSize: 8.5,
+    detailFontSize: 7.5,
+    subjectFontSize: 8,
+    attentionGap: 15,
+    bottomGap: 12,
+  });
 };
 
 const drawTemplateIntro = (doc, estimation) => {
@@ -963,7 +941,7 @@ const drawTemplateIntro = (doc, estimation) => {
 
   drawTopAccent(doc);
   drawHeader(doc, estimation);
-  return drawSubjectAttention(doc, estimation, 110);
+  return drawClientSubject(doc, estimation, 102, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 16 });
 };
 
 const previewEstimation = {
@@ -1068,9 +1046,8 @@ export const generateEstimationPdf = async (estimationInput, options = {}) => {
 
   doc.rect(0, 0, PAGE.width, PAGE.height).fill(COLORS.white);
   const afterSubjectY = drawTemplateIntro(doc, estimation);
-  drawSectionHeader(doc, "Items", afterSubjectY + 4);
 
-  const tableEndY = drawItemsTable(doc, estimation, afterSubjectY + 20);
+  const tableEndY = drawItemsTable(doc, estimation, afterSubjectY + 8);
   const totalsEndY = drawTotals(doc, estimation, tableEndY);
   drawFooter(doc, totalsEndY + 4);
 
