@@ -302,8 +302,8 @@ const drawSubjectAttention = (doc, estimation, startY) => {
     });
 
   doc
-    .moveTo(dividerX, startY)
-    .lineTo(dividerX, startY + 34)
+    .moveTo(dividerX, startY - 14)
+    .lineTo(dividerX, startY + 50)
     .lineWidth(0.75)
     .strokeColor(COLORS.border)
     .stroke();
@@ -357,26 +357,26 @@ const drawSectionHeader = (doc, label, y) => {
     .stroke();
 };
 
-// compact levels: 0 = normal, 1 = compact (24-40 items), 2 = ultra (>40 items)
+// compact levels: 0 = normal, 1 = compact (15-28 items), 2 = ultra (>28 items)
 const getCompactLevel = (itemCount) => {
-  if (itemCount > 40) return 2;
-  if (itemCount > 23) return 1;
+  if (itemCount > 28) return 2;
+  if (itemCount > 14) return 1;
   return 0;
 };
 
 const COMPACT_PARAMS = [
-  // level 0: normal (≤23 items) — matches HTML CSS exactly (padding:1.4pt 3pt, name:7pt, desc:6pt, img:18pt)
-  { paddingX: 3, paddingY: 1.4, imageSize: 18, imageGap: 2, nameFontSize: 7.0, descFontSize: 6.0, minRowHeight: 18, showDesc: true },
-  // level 1: compact (24-40 items)
-  { paddingX: 2.5, paddingY: 1.2, imageSize: 14, imageGap: 2, nameFontSize: 6.0, descFontSize: 5.0, minRowHeight: 13, showDesc: true },
-  // level 2: ultra (>40 items) — fits 50 items on one page
-  { paddingX: 2, paddingY: 1.0, imageSize: 0, imageGap: 0, nameFontSize: 5.2, descFontSize: 4.4, minRowHeight: 9, showDesc: true },
+  // level 0: normal (≤14 items)
+  { paddingX: 3, paddingY: 1.4, imageSize: 14, imageGap: 2, nameFontSize: 6.5, descFontSize: 5.5, minRowHeight: 16, showDesc: true },
+  // level 1: compact (15-28 items)
+  { paddingX: 2.5, paddingY: 1.2, imageSize: 10, imageGap: 2, nameFontSize: 6.0, descFontSize: 5.0, minRowHeight: 12, showDesc: true },
+  // level 2: ultra (>28 items) — fits 40+ items on one page
+  { paddingX: 2, paddingY: 1.0, imageSize: 0, imageGap: 0, nameFontSize: 5.5, descFontSize: 4.6, minRowHeight: 9, showDesc: true },
 ];
 
 const drawDescriptionCell = (doc, item, x, y, width, compactLevel = 0) => {
   const cp = COMPACT_PARAMS[compactLevel];
   const { paddingX, paddingY, imageSize, imageGap, nameFontSize, descFontSize } = cp;
-  const hasImage = Boolean(item.imageSource);
+  const hasImage = Boolean(item.imageSource) && imageSize > 0;
 
   let textX = x + paddingX;
   let textWidth = width - paddingX * 2;
@@ -422,7 +422,7 @@ const drawDescriptionCell = (doc, item, x, y, width, compactLevel = 0) => {
 const getDescriptionHeight = (doc, item, width, compactLevel = 0) => {
   const cp = COMPACT_PARAMS[compactLevel];
   const { paddingX, imageSize, imageGap, nameFontSize, descFontSize, minRowHeight } = cp;
-  const hasImage = Boolean(item.imageSource);
+  const hasImage = Boolean(item.imageSource) && imageSize > 0;
   const textWidth = width - paddingX * 2 - (hasImage ? imageSize + imageGap : 0);
 
   doc.font("Helvetica-Bold").fontSize(nameFontSize);
@@ -669,7 +669,7 @@ const drawTotals = (doc, estimation, startY) => {
   const tableRightX = mm(16) + (PAGE.width - mm(32));
   const boxX = tableRightX - boxWidth;
   const rowHeight = 14;
-  let y = startY + 4;
+  let y = startY + 2;
 
   const rows = [
     ["Sub Total (PKR)", formatMoney(subTotal), false],

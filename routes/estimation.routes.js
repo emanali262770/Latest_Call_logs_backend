@@ -6,6 +6,7 @@ import {
   getEstimationTemplates,
   getEstimations,
   printEstimationById,
+  printEstimationPdf,
   printEstimations,
   updateEstimation,
 } from "../controllers/estimation.controller.js";
@@ -68,6 +69,13 @@ router.get(
   protect,
   checkPermission("INVENTORY.ESTIMATION.PRINT"),
   printEstimationById
+);
+
+router.get(
+  "/:id/print-pdf",
+  protect,
+  checkPermission("INVENTORY.ESTIMATION.PRINT"),
+  printEstimationPdf
 );
 
 export default router;

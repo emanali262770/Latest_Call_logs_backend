@@ -1,3 +1,4 @@
+import fs from "fs";
 import { db } from "../config/db.js";
 import {
   createEstimationHeaderModel,
@@ -20,7 +21,7 @@ import {
   getEstimationPrintTemplates,
   isValidEstimationTemplate,
 } from "../services/estimationPrintTemplate.service.js";
-import { ensureEstimationTemplatePreviewPdfs } from "../services/estimationPdf.service.js";
+import { ensureEstimationTemplatePreviewPdfs, generateEstimationPdf } from "../services/estimationPdf.service.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 const toNumber = (value, fallback = 0) => {
@@ -538,5 +539,41 @@ export const printEstimationById = async (req, res) => {
   } catch (error) {
     console.error("printEstimationById error:", error);
     return errorResponse(res, "Failed to fetch estimation for print", 500);
+  }
+};
+
+export const printEstimationPdf = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const estimation = await getEstimationByIdModel(id);
+
+    if (!estimation) {
+      return errorResponse(res, "Estimation not found", 404);
+    }
+
+    const company = await getCompanySummaryModel();
+    const estimationWithItems = await attachItemsAndSummary(estimation);
+
+    const { filePath, fileName } = await generateEstimationPdf({
+      ...estimationWithItems,
+      company,
+      forProduct: estimationWithItems.serviceName,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+    stream.on("end", () => {
+      try { fs.unlinkSync(filePath); } catch {}
+    });
+    stream.on("error", (err) => {
+      console.error("printEstimationPdf stream error:", err);
+      if (!res.headersSent) errorResponse(res, "Failed to stream PDF", 500);
+    });
+  } catch (error) {
+    console.error("printEstimationPdf error:", error);
+    return errorResponse(res, "Failed to generate estimation PDF", 500);
   }
 };

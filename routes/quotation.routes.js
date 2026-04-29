@@ -8,7 +8,9 @@ import {
   getQuotationByRevisionId,
   getQuotationTemplates,
   getQuotations,
+  printQuotationHtml,
   printQuotationById,
+  printQuotationPdf,
   reviseQuotation,
   sendQuotation,
   updateQuotation,
@@ -72,6 +74,20 @@ router.get(
   protect,
   checkPermission("INVENTORY.QUOTATION.PRINT"),
   printQuotationById
+);
+
+router.get(
+  "/:id/print-html",
+  protect,
+  checkPermission("INVENTORY.QUOTATION.PRINT"),
+  printQuotationHtml
+);
+
+router.get(
+  "/:id/print-pdf",
+  protect,
+  checkPermission("INVENTORY.QUOTATION.PRINT"),
+  printQuotationPdf
 );
 
 router.post(
