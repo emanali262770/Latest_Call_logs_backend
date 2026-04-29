@@ -200,14 +200,12 @@ const normalizeEstimation = (input) => {
 };
 
 const drawTopAccent = (doc) => {
-  doc.save();
-  doc.rect(0, 0, PAGE.width, 3.5).fill(COLORS.text);
-  doc.restore();
+  return doc;
 };
 
 const drawHeader = (doc, estimation) => {
   const contentX = mm(16);
-  const topY = mm(7) + 3.5;
+  const topY = mm(7);
   const rightBlockX = 392;
   const rightBlockWidth = 158;
 
@@ -271,41 +269,42 @@ const drawHeader = (doc, estimation) => {
     .stroke();
 };
 
+// Template-aware accent colors for the Bill To panel
+const TEMPLATE_ACCENT = {
+  executive_letterhead: "#111827",
+  technical_bid:        "#4B5563",
+  premium_tax:          "#8A7A60",
+  modern_clean:         "#6B7280",
+  compact_commercial:   "#1F2937",
+};
+
 const drawClientSubject = (doc, estimation, startY, options = {}) => {
   const x = options.x ?? mm(16);
-  const width = options.width ?? PAGE.width - mm(32);
-  const textColor = options.color ?? COLORS.text;
-  const mutedColor = options.mutedColor ?? COLORS.muted;
-  let y = startY;
+  const fullWidth = options.width ?? PAGE.width - mm(32);
+  const template = estimation.printTemplate || 'executive_letterhead';
+  const accentColor = TEMPLATE_ACCENT[template] || TEMPLATE_ACCENT.executive_letterhead;
+  const y = startY;
 
-  if (estimation.customerName !== "-") {
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(options.customerFontSize ?? 9.5)
-      .fillColor(textColor)
-      .text(estimation.customerName, x, y, { width });
-    y += 13;
-  }
+  doc.rect(x, y, fullWidth, 52).fill('#FFFFFF');
+  doc.rect(x, y, 3, 52).fill(accentColor);
+  doc.moveTo(x, y + 52).lineTo(x + fullWidth, y + 52).lineWidth(0.6).strokeColor('#D1D5DB').stroke();
 
-  const attentionText =
-    estimation.person !== "-"
-      ? `Attn: ${estimation.person}${estimation.designation !== "-" ? ` - ${estimation.designation}` : ""}`
-      : "Attn: -";
+  const innerX = x + 13;
+  const innerW = fullWidth - 18;
 
-  doc
-    .font("Helvetica")
-    .fontSize(options.detailFontSize ?? 8.5)
-    .fillColor(mutedColor)
-    .text(attentionText, x, y, { width });
-  y += options.attentionGap ?? 18;
+  const custName = estimation.customerName !== '-' ? estimation.customerName : '-';
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#0F172A')
+    .text(custName, innerX, y + 9, { width: innerW });
 
-  doc
-    .font("Helvetica")
-    .fontSize(options.subjectFontSize ?? 9)
-    .fillColor(textColor)
-    .text(`Subject:- Estimation for ${v(estimation.serviceName)}`, x, y, { width });
+  const _desig = estimation.designation !== '-' ? ' - ' + estimation.designation : '';
+  const attentionText = estimation.person !== '-' ? 'Attn: ' + estimation.person + _desig : 'Attn: -';
+  doc.font('Helvetica').fontSize(7.8).fillColor('#64748B')
+    .text(attentionText, innerX, y + 24, { width: innerW });
 
-  return y + (options.bottomGap ?? 18);
+  doc.font('Helvetica').fontSize(8.5).fillColor('#1E293B')
+    .text('Subject:  Estimation for ' + v(estimation.serviceName), innerX, y + 37, { width: innerW });
+
+  return y + 52 + (options.bottomGap ?? 12);
 };
 
 const drawSectionHeader = (doc, label, y) => {
@@ -331,6 +330,44 @@ const getCompactLevel = (itemCount) => {
   if (itemCount > 28) return 2;
   if (itemCount > 14) return 1;
   return 0;
+};
+
+const getDocSpacing = (itemCount) => {
+  const compactLevel = getCompactLevel(itemCount);
+  if (compactLevel === 2) {
+    return {
+      subjectBottomGap: 6,
+      tableGap: 3,
+      totalsGap: 1,
+      footerOffset: 2,
+      footerFontSize: 5.4,
+      footerLineGap: 0.5,
+      signGap: 6,
+      signCompanyGap: 15,
+    };
+  }
+  if (compactLevel === 1) {
+    return {
+      subjectBottomGap: 8,
+      tableGap: 5,
+      totalsGap: 2,
+      footerOffset: 4,
+      footerFontSize: 5.8,
+      footerLineGap: 0.8,
+      signGap: 7,
+      signCompanyGap: 17,
+    };
+  }
+  return {
+    subjectBottomGap: 12,
+    tableGap: 8,
+    totalsGap: 4,
+    footerOffset: 8,
+    footerFontSize: 6,
+    footerLineGap: 1,
+    signGap: 8,
+    signCompanyGap: 19,
+  };
 };
 
 const COMPACT_PARAMS = [
@@ -416,54 +453,54 @@ const getDescriptionHeight = (doc, item, width, compactLevel = 0) => {
 // Per-template table color schemes
 const TABLE_STYLES = {
   default: {
-    headerFill: COLORS.tableHeader,
-    headerStroke: COLORS.border,
-    headerText: COLORS.text,
-    headerDivider: "#dddddd",
-    bodyStroke: COLORS.lightBorder,
-    altRowFill: COLORS.altRow,
-    bottomHeaderLine: COLORS.text,
-    bottomHeaderLineWidth: 1.5,
-  },
-  technical_bid: {
-    headerFill: "#f6f8fb",
-    headerStroke: "#b9c3d1",
-    headerText: "#111827",
-    headerDivider: "#d9e1ec",
-    bodyStroke: "#dfe5ee",
-    altRowFill: "#fbfcfe",
+    headerFill: "#111827",
+    headerStroke: "#111827",
+    headerText: "#ffffff",
+    headerDivider: "#374151",
+    bodyStroke: "#d1d5db",
+    altRowFill: "#f9fafb",
     bottomHeaderLine: "#111827",
     bottomHeaderLineWidth: 1.15,
   },
-  modern_clean: {
-    headerFill: "#1264a3",
-    headerStroke: "#0d4f82",
+  technical_bid: {
+    headerFill: "#4b5563",
+    headerStroke: "#4b5563",
     headerText: "#ffffff",
-    headerDivider: "#1a7abf",
-    bodyStroke: "#d0e8f7",
-    altRowFill: "#f0f7ff",
-    bottomHeaderLine: "#0d4f82",
-    bottomHeaderLineWidth: 1.5,
+    headerDivider: "#6b7280",
+    bodyStroke: "#d1d5db",
+    altRowFill: "#f3f4f6",
+    bottomHeaderLine: "#374151",
+    bottomHeaderLineWidth: 1.15,
+  },
+  modern_clean: {
+    headerFill: "#6b7280",
+    headerStroke: "#6b7280",
+    headerText: "#ffffff",
+    headerDivider: "#9ca3af",
+    bodyStroke: "#d1d5db",
+    altRowFill: "#f9fafb",
+    bottomHeaderLine: "#6b7280",
+    bottomHeaderLineWidth: 1.15,
   },
   premium_tax: {
-    headerFill: "#0f3d2e",
-    headerStroke: "#c9a24d",
-    headerText: "#f5e6bc",
-    headerDivider: "#1a5c44",
-    bodyStroke: "#d6c89a",
-    altRowFill: "#fdfaf3",
-    bottomHeaderLine: "#c9a24d",
-    bottomHeaderLineWidth: 1.5,
+    headerFill: "#8a7a60",
+    headerStroke: "#8a7a60",
+    headerText: "#ffffff",
+    headerDivider: "#b6aa92",
+    bodyStroke: "#d7cfbf",
+    altRowFill: "#faf8f4",
+    bottomHeaderLine: "#8a7a60",
+    bottomHeaderLineWidth: 1.15,
   },
   compact_commercial: {
-    headerFill: "#111827",
-    headerStroke: "#374151",
+    headerFill: "#1f2937",
+    headerStroke: "#1f2937",
     headerText: "#f9fafb",
-    headerDivider: "#374151",
-    bodyStroke: "#e5e7eb",
+    headerDivider: "#4b5563",
+    bodyStroke: "#d1d5db",
     altRowFill: "#f9fafb",
-    bottomHeaderLine: "#374151",
-    bottomHeaderLineWidth: 1.2,
+    bottomHeaderLine: "#1f2937",
+    bottomHeaderLineWidth: 1.15,
   },
 };
 
@@ -650,11 +687,12 @@ const drawTotals = (doc, estimation, startY) => {
   const { isWithTax, anyDiscount, grandTotal, items } = estimation;
   const template = estimation.printTemplate || "default";
   const style = TABLE_STYLES[template] || TABLE_STYLES.default;
+  const spacing = getDocSpacing(items.length);
   const boxWidth = mm(72);
   const tableRightX = mm(16) + (PAGE.width - mm(32));
   const boxX = tableRightX - boxWidth;
   const rowHeight = 14;
-  let y = startY + 2;
+  let y = startY + spacing.totalsGap;
 
   const subTotal = items.reduce((s, i) => s + Number(i.saleTotal || 0), 0);
   const subTotalWithTax = items.reduce((s, i) => s + Number(i.saleTotalWithTax || 0), 0);
@@ -720,18 +758,19 @@ const drawTotals = (doc, estimation, startY) => {
     y += h;
   });
 
-  return y + 2;
+  return y + spacing.totalsGap;
 };
 
-const drawFooter = (doc, endY) => {
-  const y = Math.min(endY + 8, 774);
+const drawFooter = (doc, endY, itemCount = 0) => {
+  const spacing = getDocSpacing(itemCount);
+  const y = Math.min(endY + spacing.footerOffset, 774);
   const x = mm(16);
   const signWidth = mm(55);
   const signX = PAGE.right - signWidth;
 
   doc
     .font("Helvetica-Oblique")
-    .fontSize(6)
+    .fontSize(spacing.footerFontSize)
     .fillColor(COLORS.soft)
     .text(
       "This estimation is prepared for review purposes only and is subject to change.\nThank you for considering Infinity Byte Solution.",
@@ -739,7 +778,7 @@ const drawFooter = (doc, endY) => {
       y,
       {
         width: mm(95),
-        lineGap: 1,
+        lineGap: spacing.footerLineGap,
       }
     );
 
@@ -754,7 +793,7 @@ const drawFooter = (doc, endY) => {
     .font("Helvetica-Bold")
     .fontSize(6.5)
     .fillColor(COLORS.text)
-    .text("AUTHORIZED SIGNATORY", signX, y + 8, {
+    .text("AUTHORIZED SIGNATORY", signX, y + spacing.signGap, {
       width: signWidth,
       align: "center",
       characterSpacing: 0.8,
@@ -764,7 +803,7 @@ const drawFooter = (doc, endY) => {
     .font("Helvetica")
     .fontSize(5.8)
     .fillColor(COLORS.soft)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), signX, y + 19, {
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), signX, y + spacing.signCompanyGap, {
       width: signWidth,
       align: "center",
       characterSpacing: 0.8,
@@ -773,49 +812,48 @@ const drawFooter = (doc, endY) => {
 
 const drawTechnicalHeader = (doc, estimation) => {
   const x = mm(16);
-  const y = 26;
+  const y = 24;
   const width = PAGE.width - mm(32);
-  const navy = "#101b2d";
-  const blue = "#2457d6";
-  const slate = "#475467";
+  const rail = "#1f2937";
+  const line = "#4b5563";
+  const slate = "#4b5563";
 
-  doc.rect(0, 0, PAGE.width, 4).fill(blue);
-  doc.rect(x, y, width, 74).lineWidth(0.9).strokeColor("#c7d0dd").stroke();
-  doc.rect(x, y, 150, 74).fill(navy);
+  doc.rect(x, y, width, 72).lineWidth(0.9).strokeColor("#cfd4dc").stroke();
+  doc.rect(x, y, 132, 72).fill(rail);
   doc
     .font("Courier-Bold")
     .fontSize(12.5)
     .fillColor(COLORS.white)
-    .text(v(estimation.estimateId), x + 16, y + 26, { width: 120 });
+    .text(v(estimation.estimateId), x + 14, y + 22, { width: 104 });
   doc
     .font("Helvetica")
     .fontSize(7)
-    .fillColor("#cbd5e1")
-    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + 16, y + 52, {
-      width: 120,
+    .fillColor("#d1d5db")
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + 14, y + 46, {
+      width: 104,
     });
   doc
     .font("Helvetica-Bold")
-    .fontSize(17)
+    .fontSize(16)
     .fillColor(COLORS.text)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 174, y + 15, { width: 270 });
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 154, y + 14, { width: 290 });
   doc
     .font("Helvetica")
     .fontSize(7.8)
     .fillColor(slate)
-    .text(STATIC_COMPANY_PROFILE.address, x + 174, y + 39, {
-      width: 245,
+    .text(STATIC_COMPANY_PROFILE.address, x + 154, y + 34, {
+      width: 265,
       lineGap: 2,
     });
   doc
     .font("Helvetica")
     .fontSize(6.7)
     .fillColor("#667085")
-    .text("Commercial estimation prepared for review and approval", x + 174, y + 54, {
-      width: 245,
+    .text("Commercial estimation prepared for technical and management review", x + 154, y + 50, {
+      width: 265,
     });
 
-  return drawClientSubject(doc, estimation, 124);
+  return drawClientSubject(doc, estimation, 116);
 };
 
 const drawModernHeader = (doc, estimation) => {
@@ -823,35 +861,37 @@ const drawModernHeader = (doc, estimation) => {
   const y = 26;
   const width = PAGE.width - mm(32);
 
-  doc.roundedRect(x, y, width, 76, 10).fill("#1264a3");
+  doc.rect(x, y, width, 70).fill("#f9fafb");
+  doc.rect(x, y, width, 70).lineWidth(0.9).strokeColor("#d1d5db").stroke();
+  doc.rect(x, y, 4, 70).fill("#6b7280");
   doc
     .font("Helvetica-Bold")
-    .fontSize(17)
-    .fillColor(COLORS.white)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 18, y + 17, { width: 270 });
+    .fontSize(16)
+    .fillColor(COLORS.text)
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 18, y + 15, { width: 270 });
   doc
     .font("Helvetica")
     .fontSize(7)
-    .fillColor("#d8ecff")
-    .text(STATIC_COMPANY_PROFILE.address, x + 18, y + 43, { width: 260 });
+    .fillColor("#6b7280")
+    .text(STATIC_COMPANY_PROFILE.address, x + 18, y + 35, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(13)
-    .fillColor(COLORS.white)
-    .text(v(estimation.estimateId), x + width - 160, y + 22, {
+    .fillColor(COLORS.text)
+    .text(v(estimation.estimateId), x + width - 160, y + 18, {
       width: 140,
       align: "right",
     });
   doc
     .font("Helvetica")
     .fontSize(8)
-    .fillColor("#d8ecff")
-    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 40, {
+    .fillColor("#6b7280")
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 36, {
       width: 140,
       align: "right",
     });
 
-  return drawClientSubject(doc, estimation, 122);
+  return drawClientSubject(doc, estimation, 108);
 };
 
 const drawPremiumHeader = (doc, estimation) => {
@@ -859,22 +899,21 @@ const drawPremiumHeader = (doc, estimation) => {
   const topY = 28;
   const rightBlockX = 392;
 
-  doc.rect(0, 0, PAGE.width, 8).fill("#0f3d2e");
-  doc.rect(0, 8, PAGE.width, 3).fill("#c9a24d");
+  doc.moveTo(x, 82).lineTo(PAGE.right, 82).lineWidth(0.8).strokeColor("#b6aa92").stroke();
   doc
     .font("Helvetica-Bold")
     .fontSize(18)
-    .fillColor("#0f3d2e")
+    .fillColor("#3f3a33")
     .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x, topY, { width: 280 });
   doc
     .font("Helvetica")
     .fontSize(8)
     .fillColor(COLORS.muted)
-    .text(STATIC_COMPANY_PROFILE.address, x, topY + 21, { width: 260 });
+    .text(STATIC_COMPANY_PROFILE.address, x, topY + 22, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(13)
-    .fillColor("#0f3d2e")
+    .fillColor("#3f3a33")
     .text(v(estimation.estimateId), rightBlockX, topY + 8, {
       width: 158,
       align: "right",
@@ -887,9 +926,8 @@ const drawPremiumHeader = (doc, estimation) => {
       width: 158,
       align: "right",
     });
-  doc.moveTo(x, 86).lineTo(PAGE.right, 86).lineWidth(1.2).strokeColor("#c9a24d").stroke();
 
-  return drawClientSubject(doc, estimation, 106, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 18 });
+  return drawClientSubject(doc, estimation, 98, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 16 });
 };
 
 const drawCompactHeader = (doc, estimation) => {
@@ -897,17 +935,18 @@ const drawCompactHeader = (doc, estimation) => {
   const y = 24;
   const width = PAGE.width - mm(32);
 
-  doc.rect(x, y, width, 52).fill("#111827");
+  doc.rect(x, y, width, 42).fill("#1f2937");
+  doc.moveTo(x, y + 42).lineTo(x + width, y + 42).lineWidth(0.8).strokeColor("#1f2937").stroke();
   doc
     .font("Helvetica-Bold")
     .fontSize(15)
     .fillColor(COLORS.white)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 16, y + 12, { width: 260 });
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 16, y + 10, { width: 260 });
   doc
     .font("Helvetica")
     .fontSize(7)
-    .fillColor("#cbd5e1")
-    .text(STATIC_COMPANY_PROFILE.address, x + 16, y + 34, { width: 260 });
+    .fillColor("#d1d5db")
+    .text(STATIC_COMPANY_PROFILE.address, x + 16, y + 26, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(11)
@@ -916,13 +955,13 @@ const drawCompactHeader = (doc, estimation) => {
   doc
     .font("Helvetica")
     .fontSize(7.5)
-    .fillColor("#cbd5e1")
-    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 150, y + 30, {
+    .fillColor("#d1d5db")
+    .text(formatDate(estimation.estimateDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 150, y + 24, {
       width: 130,
       align: "right",
     });
 
-  return drawClientSubject(doc, estimation, 88, {
+  return drawClientSubject(doc, estimation, 78, {
     x: mm(16),
     width: PAGE.width - mm(32),
     customerFontSize: 8.5,
@@ -934,14 +973,15 @@ const drawCompactHeader = (doc, estimation) => {
 };
 
 const drawTemplateIntro = (doc, estimation) => {
+  const spacing = getDocSpacing(estimation.items?.length || 0);
   if (estimation.printTemplate === "modern_clean") return drawModernHeader(doc, estimation);
   if (estimation.printTemplate === "technical_bid") return drawTechnicalHeader(doc, estimation);
-  if (estimation.printTemplate === "premium_tax") return drawPremiumHeader(doc, estimation);
+  if (estimation.printTemplate === "premium_tax") return drawClientSubject ? drawPremiumHeader(doc, estimation) : drawPremiumHeader(doc, estimation);
   if (estimation.printTemplate === "compact_commercial") return drawCompactHeader(doc, estimation);
 
   drawTopAccent(doc);
   drawHeader(doc, estimation);
-  return drawClientSubject(doc, estimation, 102, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 16 });
+  return drawClientSubject(doc, estimation, 102, { x: mm(16), width: PAGE.width - mm(32), bottomGap: spacing.subjectBottomGap });
 };
 
 const previewEstimation = {
@@ -1047,9 +1087,10 @@ export const generateEstimationPdf = async (estimationInput, options = {}) => {
   doc.rect(0, 0, PAGE.width, PAGE.height).fill(COLORS.white);
   const afterSubjectY = drawTemplateIntro(doc, estimation);
 
-  const tableEndY = drawItemsTable(doc, estimation, afterSubjectY + 8);
+  const spacing = getDocSpacing(estimation.items?.length || 0);
+  const tableEndY = drawItemsTable(doc, estimation, afterSubjectY + spacing.tableGap);
   const totalsEndY = drawTotals(doc, estimation, tableEndY);
-  drawFooter(doc, totalsEndY + 4);
+  drawFooter(doc, totalsEndY, estimation.items?.length || 0);
 
   doc.end();
 

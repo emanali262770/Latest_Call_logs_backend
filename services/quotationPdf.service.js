@@ -1,4 +1,4 @@
-import fs from "fs";
+﻿import fs from "fs";
 import fsPromises from "fs/promises";
 import path from "path";
 import http from "http";
@@ -239,14 +239,12 @@ const mm = (value) => value * 2.83464567;
 const pt = (value) => value;
 
 const drawTopAccent = (doc) => {
-  doc.save();
-  doc.rect(0, 0, PAGE.width, pt(3.5)).fill(COLORS.text);
-  doc.restore();
+  return doc;
 };
 
 const drawHeader = (doc, quotation) => {
   const contentX = mm(16);
-  const topY = mm(7) + pt(3.5);
+  const topY = mm(7);
   const rightBlockX = 392;
   const rightBlockWidth = 158;
 
@@ -384,41 +382,41 @@ const drawSectionHeader = (doc, label, y) => {
     .stroke();
 };
 
+const TEMPLATE_ACCENT = {
+  executive_letterhead: "#111827",
+  technical_bid:        "#4B5563",
+  premium_tax:          "#8A7A60",
+  modern_clean:         "#6B7280",
+  compact_commercial:   "#1F2937",
+};
+
 const drawClientSubject = (doc, quotation, startY, options = {}) => {
   const x = options.x ?? mm(16);
-  const width = options.width ?? PAGE.width - mm(32);
-  const textColor = options.color ?? COLORS.text;
-  const mutedColor = options.mutedColor ?? COLORS.muted;
-  let y = startY;
+  const fullWidth = options.width ?? PAGE.width - mm(32);
+  const template = quotation.printTemplate || 'executive_letterhead';
+  const accentColor = TEMPLATE_ACCENT[template] || TEMPLATE_ACCENT.executive_letterhead;
+  const y = startY;
 
-  if (quotation.customerName !== "-") {
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(options.customerFontSize ?? 9.5)
-      .fillColor(textColor)
-      .text(quotation.customerName, x, y, { width });
-    y += 13;
-  }
+  doc.rect(x, y, fullWidth, 52).fill('#FFFFFF');
+  doc.rect(x, y, 3, 52).fill(accentColor);
+  doc.moveTo(x, y + 52).lineTo(x + fullWidth, y + 52).lineWidth(0.6).strokeColor('#D1D5DB').stroke();
 
-  const attentionText =
-    quotation.person !== "-"
-      ? `Attn: ${quotation.person}${quotation.designation !== "-" ? ` - ${quotation.designation}` : ""}`
-      : "Attn: -";
+  const innerX = x + 13;
+  const innerW = fullWidth - 18;
 
-  doc
-    .font("Helvetica")
-    .fontSize(options.detailFontSize ?? 8.5)
-    .fillColor(textColor)
-    .text(attentionText, x, y, { width });
-  y += options.attentionGap ?? 18;
+  const custName = quotation.customerName !== '-' ? quotation.customerName : '-';
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#0F172A')
+    .text(custName, innerX, y + 9, { width: innerW });
 
-  doc
-    .font("Helvetica")
-    .fontSize(options.subjectFontSize ?? 9)
-    .fillColor(textColor)
-    .text(`Subject:- Quotation for ${v(quotation.serviceName)}`, x, y, { width });
+  const _desig = quotation.designation !== '-' ? ' - ' + quotation.designation : '';
+  const attentionText = quotation.person !== '-' ? 'Attn: ' + quotation.person + _desig : 'Attn: -';
+  doc.font('Helvetica').fontSize(7.8).fillColor('#64748B')
+    .text(attentionText, innerX, y + 24, { width: innerW });
 
-  return y + (options.bottomGap ?? 18);
+  doc.font('Helvetica').fontSize(8.5).fillColor('#1E293B')
+    .text('Subject:  Quotation for ' + v(quotation.serviceName), innerX, y + 37, { width: innerW });
+
+  return y + 52 + (options.bottomGap ?? 12);
 };
 
 const getCompactLevel = (itemCount) => {
@@ -427,65 +425,109 @@ const getCompactLevel = (itemCount) => {
   return 0;
 };
 
+const getDocSpacing = (itemCount) => {
+  const compactLevel = getCompactLevel(itemCount);
+  if (compactLevel === 2) {
+    return {
+      subjectBottomGap: 6,
+      tableGap: 3,
+      totalsGap: 1,
+      termsGap: 3,
+      termsOffset: 10,
+      footerOffset: 2,
+      footerFontSize: 6.3,
+      footerLineGap: 1,
+      signGap: 6,
+      signCompanyGap: 15,
+    };
+  }
+  if (compactLevel === 1) {
+    return {
+      subjectBottomGap: 8,
+      tableGap: 5,
+      totalsGap: 2,
+      termsGap: 5,
+      termsOffset: 11,
+      footerOffset: 4,
+      footerFontSize: 6.8,
+      footerLineGap: 1.4,
+      signGap: 7,
+      signCompanyGap: 17,
+    };
+  }
+  return {
+    subjectBottomGap: 12,
+    tableGap: 6,
+    totalsGap: 2,
+    termsGap: 8,
+    termsOffset: 12,
+    footerOffset: 6,
+    footerFontSize: 7.5,
+    footerLineGap: 2,
+    signGap: 8,
+    signCompanyGap: 19,
+  };
+};
+
 const COMPACT_PARAMS = [
-  // level 0: normal (≤14 items)
+  // level 0: normal (â‰¤14 items)
   { paddingX: 3, paddingY: 1.4, imageSize: 14, imageGap: 2, nameFontSize: 6.5, descFontSize: 5.5, minRowHeight: 16, showDesc: true },
   // level 1: compact (15-28 items)
   { paddingX: 2.5, paddingY: 1.2, imageSize: 10, imageGap: 2, nameFontSize: 6.0, descFontSize: 5.0, minRowHeight: 12, showDesc: true },
-  // level 2: ultra (>28 items) — fits 40+ items on one page
+  // level 2: ultra (>28 items) â€” fits 40+ items on one page
   { paddingX: 2, paddingY: 1.0, imageSize: 0, imageGap: 0, nameFontSize: 5.5, descFontSize: 4.6, minRowHeight: 9, showDesc: true },
 ];
 
 const TABLE_STYLES = {
   default: {
-    headerFill: COLORS.tableHeader,
-    headerStroke: COLORS.border,
-    headerText: COLORS.text,
-    headerDivider: "#dddddd",
-    bodyStroke: COLORS.lightBorder,
-    altRowFill: COLORS.altRow,
-    bottomHeaderLine: COLORS.text,
-    bottomHeaderLineWidth: 1.5,
-  },
-  technical_bid: {
-    headerFill: "#f6f8fb",
-    headerStroke: "#b9c3d1",
-    headerText: "#111827",
-    headerDivider: "#d9e1ec",
-    bodyStroke: "#dfe5ee",
-    altRowFill: "#fbfcfe",
+    headerFill: "#111827",
+    headerStroke: "#111827",
+    headerText: "#ffffff",
+    headerDivider: "#374151",
+    bodyStroke: "#d1d5db",
+    altRowFill: "#f9fafb",
     bottomHeaderLine: "#111827",
     bottomHeaderLineWidth: 1.15,
   },
-  modern_clean: {
-    headerFill: "#1264a3",
-    headerStroke: "#0d4f82",
+  technical_bid: {
+    headerFill: "#4b5563",
+    headerStroke: "#4b5563",
     headerText: "#ffffff",
-    headerDivider: "#1a7abf",
-    bodyStroke: "#d0e8f7",
-    altRowFill: "#f0f7ff",
-    bottomHeaderLine: "#0d4f82",
-    bottomHeaderLineWidth: 1.5,
+    headerDivider: "#6b7280",
+    bodyStroke: "#d1d5db",
+    altRowFill: "#f3f4f6",
+    bottomHeaderLine: "#374151",
+    bottomHeaderLineWidth: 1.15,
+  },
+  modern_clean: {
+    headerFill: "#6b7280",
+    headerStroke: "#6b7280",
+    headerText: "#ffffff",
+    headerDivider: "#9ca3af",
+    bodyStroke: "#d1d5db",
+    altRowFill: "#f9fafb",
+    bottomHeaderLine: "#6b7280",
+    bottomHeaderLineWidth: 1.15,
   },
   premium_tax: {
-    headerFill: "#0f3d2e",
-    headerStroke: "#c9a24d",
-    headerText: "#f5e6bc",
-    headerDivider: "#1a5c44",
-    bodyStroke: "#d6c89a",
-    altRowFill: "#fdfaf3",
-    bottomHeaderLine: "#c9a24d",
-    bottomHeaderLineWidth: 1.5,
+    headerFill: "#8a7a60",
+    headerStroke: "#8a7a60",
+    headerText: "#ffffff",
+    headerDivider: "#b6aa92",
+    bodyStroke: "#d7cfbf",
+    altRowFill: "#faf8f4",
+    bottomHeaderLine: "#8a7a60",
+    bottomHeaderLineWidth: 1.15,
   },
   compact_commercial: {
-    headerFill: "#111827",
-    headerStroke: "#374151",
+    headerFill: "#1f2937",
+    headerStroke: "#1f2937",
     headerText: "#f9fafb",
-    headerDivider: "#374151",
-    bodyStroke: "#e5e7eb",
+    headerDivider: "#4b5563",
+    bodyStroke: "#d1d5db",
     altRowFill: "#f9fafb",
-    bottomHeaderLine: "#374151",
-    bottomHeaderLineWidth: 1.2,
+    bottomHeaderLine: "#1f2937",
+    bottomHeaderLineWidth: 1.15,
   },
 };
 
@@ -703,11 +745,12 @@ const drawTotals = (doc, quotation, startY) => {
   const template = quotation.printTemplate || "default";
   const style = TABLE_STYLES[template] || TABLE_STYLES.default;
   const layout = getBodyLayout(template);
+  const spacing = getDocSpacing(quotation.items?.length || 0);
   const boxWidth = mm(72);
   const tableRightX = layout.x + layout.width;
   const boxX = tableRightX - boxWidth;
   const rowHeight = 14;
-  let y = startY + 2;
+  let y = startY + spacing.totalsGap;
 
   const rows = [];
   if (isWithTax) {
@@ -771,23 +814,24 @@ const drawTotals = (doc, quotation, startY) => {
     y += h;
   });
 
-  return y + 2;
+  return y + spacing.totalsGap;
 };
 
-const drawTerms = (doc, startY) => {
+const drawTerms = (doc, startY, itemCount = 0) => {
+  const spacing = getDocSpacing(itemCount);
   drawSectionHeader(doc, "Terms & Conditions", startY);
 
   const x = mm(16);
   const width = PAGE.width - mm(32);
-  let y = startY + 12;
+  let y = startY + spacing.termsOffset;
   // HTML: gap=3pt from bullet left edge, text starts after bullet (3.5pt circle + 3pt gap)
   const bulletLeft = x + 3;
   const bulletSize = 3.5; // diameter matching HTML 3.5pt
   const bulletRadius = bulletSize / 2;
   const textX = bulletLeft + bulletSize + 3; // 3pt gap between bullet and text
   const textWidth = width - (textX - x);
-  const fontSize = 6.5;
-  const lineGap = 0.2;
+  const fontSize = getCompactLevel(itemCount) === 2 ? 5.7 : getCompactLevel(itemCount) === 1 ? 6.1 : 6.5;
+  const lineGap = getCompactLevel(itemCount) === 2 ? 0 : 0.2;
 
   TERMS.forEach((term) => {
     doc
@@ -807,21 +851,22 @@ const drawTerms = (doc, startY) => {
 
     const textHeight = doc.heightOfString(term, { width: textWidth, lineGap });
 
-    y += textHeight + 0.4;
+    y += textHeight + (getCompactLevel(itemCount) === 2 ? 0.1 : 0.4);
   });
 
   return y;
 };
 
-const drawFooter = (doc, endY) => {
-  const y = Math.min(endY + 6, 774);
+const drawFooter = (doc, endY, itemCount = 0) => {
+  const spacing = getDocSpacing(itemCount);
+  const y = Math.min(endY + spacing.footerOffset, 774);
   const x = mm(16);
   const signWidth = mm(55);
   const signX = PAGE.right - signWidth;
 
   doc
     .font("Helvetica-Oblique")
-    .fontSize(7.5)
+    .fontSize(spacing.footerFontSize)
     .fillColor(COLORS.soft)
     .text(
       "We trust this offer meets your requirements. For clarifications, please feel free to contact us.\nThank you for considering Infinity Byte Solution.",
@@ -829,7 +874,7 @@ const drawFooter = (doc, endY) => {
       y,
       {
         width: mm(95),
-        lineGap: 2,
+        lineGap: spacing.footerLineGap,
       }
     );
 
@@ -844,7 +889,7 @@ const drawFooter = (doc, endY) => {
     .font("Helvetica-Bold")
     .fontSize(7.5)
     .fillColor(COLORS.text)
-    .text("AUTHORIZED SIGNATORY", signX, y + 8, {
+    .text("AUTHORIZED SIGNATORY", signX, y + spacing.signGap, {
       width: signWidth,
       align: "center",
       characterSpacing: 0.8,
@@ -854,7 +899,7 @@ const drawFooter = (doc, endY) => {
     .font("Helvetica")
     .fontSize(6.5)
     .fillColor(COLORS.soft)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), signX, y + 19, {
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), signX, y + spacing.signCompanyGap, {
       width: signWidth,
       align: "center",
       characterSpacing: 0.8,
@@ -866,74 +911,75 @@ const drawModernHeader = (doc, quotation) => {
   const y = 26;
   const width = PAGE.width - mm(32);
 
-  doc.roundedRect(x, y, width, 76, 10).fill("#1264a3");
+  doc.rect(x, y, width, 70).fill("#f9fafb");
+  doc.rect(x, y, width, 70).lineWidth(0.9).strokeColor("#d1d5db").stroke();
+  doc.rect(x, y, 4, 70).fill("#6b7280");
   doc
     .font("Helvetica-Bold")
-    .fontSize(17)
-    .fillColor(COLORS.white)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 18, y + 17, { width: 270 });
+    .fontSize(16)
+    .fillColor(COLORS.text)
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 18, y + 15, { width: 270 });
   doc
     .font("Helvetica")
     .fontSize(7)
-    .fillColor("#d8ecff")
-    .text(STATIC_COMPANY_PROFILE.address, x + 18, y + 43, { width: 260 });
+    .fillColor("#6b7280")
+    .text(STATIC_COMPANY_PROFILE.address, x + 18, y + 35, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(13)
-    .fillColor(COLORS.white)
-    .text(v(quotation.quotationNo), x + width - 160, y + 22, {
+    .fillColor(COLORS.text)
+    .text(v(quotation.quotationNo), x + width - 160, y + 18, {
       width: 140,
       align: "right",
     });
   doc
     .font("Helvetica")
     .fontSize(8)
-    .fillColor("#d8ecff")
-    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 40, {
+    .fillColor("#6b7280")
+    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 160, y + 36, {
       width: 140,
       align: "right",
     });
 
-  return drawClientSubject(doc, quotation, 118, { x: mm(18), width: PAGE.width - mm(36), bottomGap: 16 });
+  return drawClientSubject(doc, quotation, 108, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 16 });
 };
 
 const drawTechnicalHeader = (doc, quotation) => {
   const x = mm(16);
-  const y = 26;
+  const y = 24;
   const width = PAGE.width - mm(32);
-  const navy = "#101b2d";
-  const blue = "#2457d6";
+  const rail = "#1f2937";
+  const line = "#4b5563";
   const slate = "#475467";
 
-  doc.rect(0, 0, PAGE.width, 4).fill(blue);
-  doc.rect(x, y, width, 74).lineWidth(0.9).strokeColor("#c7d0dd").stroke();
-  doc.rect(x, y, 150, 74).fill(navy);
+  doc.rect(x, y, width, 72).lineWidth(0.9).strokeColor("#cfd4dc").stroke();
+  doc.rect(x, y, 132, 72).fill(rail);
   doc
     .font("Courier-Bold")
     .fontSize(12.5)
     .fillColor(COLORS.white)
-    .text(v(quotation.quotationNo), x + 16, y + 22, { width: 120 });
+    .text(v(quotation.quotationNo), x + 14, y + 22, { width: 104 });
   doc
     .font("Helvetica")
     .fontSize(7)
-    .fillColor("#cbd5e1")
-    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + 16, y + 42, {
-      width: 120,
+    .fillColor("#d1d5db")
+    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + 14, y + 46, {
+      width: 104,
     });
   doc
     .font("Helvetica-Bold")
-    .fontSize(17)
+    .fontSize(16)
     .fillColor(COLORS.text)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 174, y + 15, { width: 270 });
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 154, y + 14, { width: 290 });
   doc
     .font("Helvetica")
     .fontSize(7.8)
     .fillColor(slate)
-    .text(STATIC_COMPANY_PROFILE.address, x + 174, y + 39, {
-      width: 245,
+    .text(STATIC_COMPANY_PROFILE.address, x + 154, y + 34, {
+      width: 265,
       lineGap: 2,
     });
-  return drawClientSubject(doc, quotation, 118, { x: mm(18), width: PAGE.width - mm(36), bottomGap: 14 });
+  return drawClientSubject(doc, quotation, 116, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 14 });
 };
 
 const drawPremiumHeader = (doc, quotation) => {
@@ -941,22 +987,21 @@ const drawPremiumHeader = (doc, quotation) => {
   const topY = 28;
   const rightBlockX = 392;
 
-  doc.rect(0, 0, PAGE.width, 8).fill("#0f3d2e");
-  doc.rect(0, 8, PAGE.width, 3).fill("#c9a24d");
+  doc.moveTo(x, 82).lineTo(PAGE.right, 82).lineWidth(0.8).strokeColor("#b6aa92").stroke();
   doc
     .font("Helvetica-Bold")
     .fontSize(18)
-    .fillColor("#0f3d2e")
+    .fillColor("#3f3a33")
     .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x, topY, { width: 280 });
   doc
     .font("Helvetica")
     .fontSize(8)
     .fillColor(COLORS.muted)
-    .text(STATIC_COMPANY_PROFILE.address, x, topY + 26, { width: 260 });
+    .text(STATIC_COMPANY_PROFILE.address, x, topY + 22, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(13)
-    .fillColor("#0f3d2e")
+    .fillColor("#3f3a33")
     .text(v(quotation.quotationNo), rightBlockX, topY + 8, {
       width: 158,
       align: "right",
@@ -969,9 +1014,8 @@ const drawPremiumHeader = (doc, quotation) => {
       width: 158,
       align: "right",
     });
-  doc.moveTo(x, 86).lineTo(PAGE.right, 86).lineWidth(1.2).strokeColor("#c9a24d").stroke();
 
-  return drawClientSubject(doc, quotation, 106, { x: mm(22), width: PAGE.width - mm(44), bottomGap: 18 });
+  return drawClientSubject(doc, quotation, 98, { x: mm(16), width: PAGE.width - mm(32), bottomGap: 16 });
 };
 
 const drawCompactHeader = (doc, quotation) => {
@@ -979,17 +1023,18 @@ const drawCompactHeader = (doc, quotation) => {
   const y = 24;
   const width = PAGE.width - mm(32);
 
-  doc.rect(x, y, width, 52).fill("#111827");
+  doc.rect(x, y, width, 42).fill("#1f2937");
+  doc.moveTo(x, y + 42).lineTo(x + width, y + 42).lineWidth(0.8).strokeColor("#1f2937").stroke();
   doc
     .font("Helvetica-Bold")
     .fontSize(15)
     .fillColor(COLORS.white)
-    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 16, y + 12, { width: 260 });
+    .text(STATIC_COMPANY_PROFILE.name.toUpperCase(), x + 16, y + 10, { width: 260 });
   doc
     .font("Helvetica")
     .fontSize(7)
-    .fillColor("#cbd5e1")
-    .text(STATIC_COMPANY_PROFILE.address, x + 16, y + 34, { width: 260 });
+    .fillColor("#d1d5db")
+    .text(STATIC_COMPANY_PROFILE.address, x + 16, y + 26, { width: 260 });
   doc
     .font("Courier-Bold")
     .fontSize(11)
@@ -998,13 +1043,13 @@ const drawCompactHeader = (doc, quotation) => {
   doc
     .font("Helvetica")
     .fontSize(7.5)
-    .fillColor("#cbd5e1")
-    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 150, y + 30, {
+    .fillColor("#d1d5db")
+    .text(formatDate(quotation.quotationDate, { day: "2-digit", month: "long", year: "numeric" }), x + width - 150, y + 24, {
       width: 130,
       align: "right",
     });
 
-  return drawClientSubject(doc, quotation, 88, {
+  return drawClientSubject(doc, quotation, 78, {
     x: mm(16),
     width: PAGE.width - mm(32),
     customerFontSize: 8.5,
@@ -1114,10 +1159,11 @@ export const generateQuotationPdf = async (quotationInput, options = {}) => {
   doc.rect(0, 0, PAGE.width, PAGE.height).fill(COLORS.white);
   const afterSubjectY = drawTemplateIntro(doc, quotation);
   const layout = getBodyLayout(quotation.printTemplate);
-  const tableEndY = drawItemsTable(doc, quotation, afterSubjectY + layout.tableGap);
+  const spacing = getDocSpacing(quotation.items?.length || 0);
+  const tableEndY = drawItemsTable(doc, quotation, afterSubjectY + Math.min(layout.tableGap, spacing.tableGap));
   const totalsEndY = drawTotals(doc, quotation, tableEndY);
-  const termsEndY = drawTerms(doc, totalsEndY + layout.termsGap);
-  drawFooter(doc, termsEndY + 2);
+  const termsEndY = drawTerms(doc, totalsEndY + Math.min(layout.termsGap, spacing.termsGap), quotation.items?.length || 0);
+  drawFooter(doc, termsEndY, quotation.items?.length || 0);
 
   doc.end();
 
