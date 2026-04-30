@@ -120,7 +120,7 @@ const itemRows = (items, isWithTax, anyDiscount) =>
           <td><strong>${esc(item.itemName)}</strong><span>${esc(item.description)}</span></td>
           <td>${money(item.qty)}</td>
           <td>${money(isWithTax ? item.salePriceWithTax : item.salePrice)}</td>
-          ${isWithTax ? `<td>${money(item.taxAmount)}</td>` : ""}
+          ${isWithTax ? `<td>${money(item.unitTaxAmount ?? item.taxAmount)}</td>` : ""}
           ${anyDiscount ? `<td>${money(item.discountAmount)}</td>` : ""}
           <td>${money(item.finalTotal)}</td>
         </tr>`
@@ -391,6 +391,7 @@ export const renderEstimationHtml = (estimationData, companyData) => {
     const salePriceWithTax = Number(item?.salePriceWithTax ?? item?.sale_price_with_tax ?? 0);
     const saleTotal = Number(item?.saleTotal ?? item?.sale_total ?? salePrice * qty);
     const saleTotalWithTax = Number(item?.saleTotalWithTax ?? item?.sale_total_with_tax ?? salePriceWithTax * qty);
+    const unitTaxAmount = salePriceWithTax - salePrice;
     const taxAmount = saleTotalWithTax - saleTotal;
     return {
       itemName: String(item?.itemName || item?.item_name || ""),
@@ -400,6 +401,7 @@ export const renderEstimationHtml = (estimationData, companyData) => {
       salePriceWithTax,
       saleTotal,
       saleTotalWithTax,
+      unitTaxAmount,
       taxAmount,
       discountPercent: Number(item?.discountPercent ?? item?.discount_percent ?? 0),
       discountAmount: Number(item?.discountAmount ?? item?.discount_amount ?? 0),

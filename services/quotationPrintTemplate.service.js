@@ -49,6 +49,17 @@ const money = (value) =>
     maximumFractionDigits: 2,
   });
 
+const getItemGstTotal = (item) => {
+  const qty = Number(item?.qty || 0);
+  const gstAmount = Number(item?.gstAmount ?? item?.gst_amount ?? 0);
+
+  if (gstAmount) {
+    return gstAmount * qty;
+  }
+
+  return Number(item?.totalWithGst ?? item?.total_with_gst ?? 0) - Number(item?.total ?? item?.amount ?? 0);
+};
+
 const dummyQuotation = {
   companyName: "Infinity Byte Solution",
   address: "Abid Majeed Road, Lahore Cantt, Lahore",
@@ -342,6 +353,17 @@ export const getQuotationPrintTemplates = () =>
   }));
 
 export const renderQuotationHtml = (quotationData, companyData) => {
+  const items = (Array.isArray(quotationData?.items) ? quotationData.items : []).map((item) => ({
+    itemName: String(item?.itemName || item?.item_name || item?.item || ""),
+    description: String(item?.description || item?.itemName || item?.item_name || item?.item || ""),
+    rate: Number(item?.rate ?? item?.price ?? 0),
+    qty: Number(item?.qty ?? 0),
+    gstAmount: Number(item?.gstAmount ?? item?.gst_amount ?? 0),
+    rateWithGst: Number(item?.rateWithGst ?? item?.rate_with_gst ?? item?.rate ?? item?.price ?? 0),
+    totalWithGst: Number(item?.totalWithGst ?? item?.total_with_gst ?? item?.total ?? 0),
+    total: Number(item?.total ?? item?.amount ?? 0),
+  }));
+
   const q = {
     companyName: String(companyData?.company_name || companyData?.name || "Infinity Byte Solution"),
     address: String(companyData?.address || companyData?.company_address || ""),
@@ -357,17 +379,9 @@ export const renderQuotationHtml = (quotationData, companyData) => {
     person: String(quotationData?.person || ""),
     designation: String(quotationData?.designation || ""),
     department: String(quotationData?.department || ""),
-    items: (Array.isArray(quotationData?.items) ? quotationData.items : []).map((item) => ({
-      itemName: String(item?.itemName || item?.item_name || item?.item || ""),
-      description: String(item?.description || item?.itemName || item?.item_name || item?.item || ""),
-      rate: Number(item?.rate ?? item?.price ?? 0),
-      qty: Number(item?.qty ?? 0),
-      gstAmount: Number(item?.gstAmount ?? item?.gst_amount ?? 0),
-      rateWithGst: Number(item?.rateWithGst ?? item?.rate_with_gst ?? item?.rate ?? item?.price ?? 0),
-      totalWithGst: Number(item?.totalWithGst ?? item?.total_with_gst ?? item?.total ?? 0),
-    })),
+    items,
     subTotal: Number(quotationData?.summary?.subTotal ?? quotationData?.subTotal ?? 0),
-    gstTotal: Number(quotationData?.summary?.gstTotal ?? quotationData?.gstTotal ?? 0),
+    gstTotal: items.reduce((sum, item) => sum + getItemGstTotal(item), 0),
     grandTotal: Number(quotationData?.summary?.grandTotal ?? quotationData?.grandTotal ?? 0),
   };
 

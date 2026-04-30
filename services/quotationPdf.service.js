@@ -232,6 +232,17 @@ const normalizeQuotation = (quotation) => {
   };
 };
 
+const getItemGstTotal = (item) => {
+  const qty = Number(item?.qty || 0);
+  const gstAmount = Number(item?.gstAmount || 0);
+
+  if (gstAmount) {
+    return gstAmount * qty;
+  }
+
+  return Number(item?.totalWithGst || 0) - Number(item?.amount || 0);
+};
+
 const isWithTaxMode = (quotation) =>
   /^with\s*tax$/i.test(String(quotation?.taxMode || "").replace(/([a-z])([A-Z])/g, "$1 $2").trim());
 
@@ -761,7 +772,7 @@ const drawTotals = (doc, quotation, startY) => {
     ]);
     rows.push([
       "GST Amount (PKR)",
-      formatMoney(quotation.items.reduce((s, i) => s + (Number(i.totalWithGst || 0) - Number(i.amount || 0)), 0)),
+      formatMoney(quotation.items.reduce((s, i) => s + getItemGstTotal(i), 0)),
       false,
     ]);
   }

@@ -143,6 +143,7 @@ const normalizeEstimation = (input) => {
         const discountPercent = Number(item?.discountPercent ?? item?.discount_percent ?? 0);
         const discountAmount = Number(item?.discountAmount ?? item?.discount_amount ?? 0);
         const finalTotal = Number(item?.finalTotal ?? item?.final_total ?? 0);
+        const unitTaxAmount = salePriceWithTax - salePrice;
         const taxAmount = saleTotalWithTax - saleTotal;
 
         return {
@@ -153,6 +154,7 @@ const normalizeEstimation = (input) => {
           salePriceWithTax,
           saleTotal,
           saleTotalWithTax,
+          unitTaxAmount,
           taxAmount,
           discountPercent,
           discountAmount,
@@ -523,7 +525,7 @@ const drawItemsTable = (doc, estimation, y) => {
         { key: "description", label: "Item", width: anyDiscount ? 140 : 166, align: "left" },
         { key: "rate", label: "Rate", width: 55, align: "right" },
         { key: "qty", label: "Qty", width: 32, align: "right" },
-        { key: "gstAmount", label: "GST Amt", width: 52, align: "right" },
+        { key: "gstAmount", label: "18% GST Rate", width: 52, align: "right" },
         { key: "rateWithGst", label: "Rate + GST", width: 68, align: "right" },
         ...(anyDiscount ? [{ key: "discAmt", label: "Disc Amt", width: 55, align: "right" }] : []),
         { key: "totalWithGst", label: "Total Amount\nWith GST", width: 0, align: "right" },
@@ -641,7 +643,7 @@ const drawItemsTable = (doc, estimation, y) => {
             fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
           case "gstAmount":
-            value = formatMoney(item.taxAmount);
+            value = formatMoney(item.unitTaxAmount ?? item.taxAmount);
             fontSize = compactLevel === 2 ? 4.8 : compactLevel === 1 ? 5.8 : 7.0;
             break;
           case "rateWithGst":
@@ -697,7 +699,7 @@ const drawTotals = (doc, estimation, startY) => {
   const subTotal = items.reduce((s, i) => s + Number(i.saleTotal || 0), 0);
   const subTotalWithTax = items.reduce((s, i) => s + Number(i.saleTotalWithTax || 0), 0);
   const discountTotal = items.reduce((s, i) => s + Number(i.discountAmount || 0), 0);
-  const gstTotal = items.reduce((s, i) => s + Number(i.taxAmount || 0), 0);
+  const gstTotal = items.reduce((s, i) => s + Number(i.taxAmount ?? i.unitTaxAmount ?? 0), 0);
 
   const rows = [];
   if (isWithTax) {
