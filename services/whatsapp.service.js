@@ -8,6 +8,13 @@ const isWhatsappConfigured = () =>
       process.env.PUBLIC_BASE_URL
   );
 
+const isTextWhatsappConfigured = () =>
+  Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_WHATSAPP_FROM
+  );
+
 const normalizeWhatsappNumber = (number) => {
   if (!number) return null;
   const cleaned = String(number).replace(/[^\d+]/g, "");
@@ -66,6 +73,33 @@ export const sendEstimationWhatsapp = async ({ to, estimation, pdfUrl }) => {
     to: `whatsapp:${normalizedTo}`,
     body: `Estimation ${estimation.estimateId} is attached.`,
     mediaUrl: [mediaUrl],
+  });
+
+  return { sent: true, to: normalizedTo, sid: message.sid };
+};
+
+export const sendTextWhatsapp = async ({ to, body }) => {
+  const normalizedTo = normalizeWhatsappNumber(to);
+  const messageBody = String(body || "").trim();
+
+  if (!normalizedTo) {
+    return { sent: false, skipped: true, reason: "Customer WhatsApp number is empty" };
+  }
+
+  if (!messageBody) {
+    return { sent: false, skipped: true, reason: "Message body is empty" };
+  }
+
+  if (!isTextWhatsappConfigured()) {
+    return { sent: false, skipped: true, reason: "Twilio WhatsApp is not configured" };
+  }
+
+  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+  const message = await client.messages.create({
+    from: process.env.TWILIO_WHATSAPP_FROM,
+    to: `whatsapp:${normalizedTo}`,
+    body: messageBody,
   });
 
   return { sent: true, to: normalizedTo, sid: message.sid };

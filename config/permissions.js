@@ -421,6 +421,20 @@ export const ALL_PERMISSIONS = [
   },
   {
     module: "INVENTORY",
+    sub_module: "MESSAGE",
+    action: "READ",
+    key_name: "INVENTORY.MESSAGE.READ",
+    description: "Read WhatsApp messages",
+  },
+  {
+    module: "INVENTORY",
+    sub_module: "MESSAGE",
+    action: "SEND",
+    key_name: "INVENTORY.MESSAGE.SEND",
+    description: "Send WhatsApp messages",
+  },
+  {
+    module: "INVENTORY",
     sub_module: "ITEM_DEFINITION",
     action: "CREATE",
     key_name: "INVENTORY.ITEM_DEFINITION.CREATE",

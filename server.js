@@ -35,6 +35,7 @@ import itemReportRoutes from './routes/itemReport.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 import estimationRoutes from './routes/estimation.routes.js';
 import quotationRoutes from './routes/quotation.routes.js';
+import messageRoutes from './routes/message.routes.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -82,6 +83,7 @@ app.use('/api/item-report', itemReportRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/estimations', estimationRoutes);
 app.use('/api/quotations', quotationRoutes);
+app.use('/api/messages', messageRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Request error:", err);

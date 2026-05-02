@@ -46,9 +46,11 @@ export const getPermissionsModel = async () => {
         WHEN module = 'INVENTORY' AND sub_module = 'LOCATION' THEN 6
         WHEN module = 'INVENTORY' AND sub_module = 'SUPPLIER' THEN 7
         WHEN module = 'INVENTORY' AND sub_module = 'CUSTOMER' THEN 8
-        WHEN module = 'INVENTORY' AND sub_module = 'ITEM_DEFINITION' THEN 9
-        WHEN module = 'INVENTORY' AND sub_module = 'OPENING_STOCK' THEN 10
-        WHEN module = 'INVENTORY' AND sub_module = 'ITEM_REPORT' THEN 11
+        WHEN module = 'INVENTORY' AND sub_module = 'CUSTOMER_GROUP' THEN 9
+        WHEN module = 'INVENTORY' AND sub_module = 'MESSAGE' THEN 10
+        WHEN module = 'INVENTORY' AND sub_module = 'ITEM_DEFINITION' THEN 11
+        WHEN module = 'INVENTORY' AND sub_module = 'OPENING_STOCK' THEN 12
+        WHEN module = 'INVENTORY' AND sub_module = 'ITEM_REPORT' THEN 13
         WHEN module = 'SERVICES' AND sub_module = 'SERVICE' THEN 1
         WHEN module = 'ACCESS' AND sub_module = 'USERS' THEN 1
         WHEN module = 'ACCESS' AND sub_module = 'GROUPS' THEN 2
@@ -63,6 +65,7 @@ export const getPermissionsModel = async () => {
         WHEN 'DELETE' THEN 4
         WHEN 'PRINT' THEN 5
         WHEN 'ASSIGN' THEN 6
+        WHEN 'SEND' THEN 7
         ELSE 99
       END,
       id ASC
