@@ -187,6 +187,7 @@ export const getMessageTemplates = async (req, res) => {
 export const previewMessage = async (req, res) => {
   try {
     const groupId = toPositiveInteger(req.body.groupId ?? req.body.group_id);
+    const customerIds = uniquePositiveIntegers(req.body.customerIds ?? req.body.customer_ids);
     const templatePayload = getTemplatePayload(req.body);
 
     if (!templatePayload.title) {
@@ -198,8 +199,19 @@ export const previewMessage = async (req, res) => {
     }
 
     const group = groupId ? await getCustomerGroupByIdModel(groupId) : null;
-    const customers = groupId ? await getActiveCustomersByGroupModel(groupId) : [];
-    const previewCustomer = customers[0] || {
+    const customers = groupId
+      ? customerIds.length
+        ? await getActiveCustomersByIdsAndGroupModel(groupId, customerIds)
+        : await getActiveCustomersByGroupModel(groupId)
+      : [];
+
+    const previewCustomer = customerIds.length
+      ? customerIds
+          .map((customerId) => customers.find((customer) => customer.id === customerId))
+          .find(Boolean)
+      : customers[0];
+
+    const fallbackCustomer = {
       person: "Customer Name",
       company: "Customer Company",
       groupName: group?.groupName || group?.group_name || "",
@@ -209,7 +221,7 @@ export const previewMessage = async (req, res) => {
       template: templatePayload,
       previewText: renderMessageTemplate(
         templatePayload.messageText,
-        previewCustomer,
+        previewCustomer || fallbackCustomer,
         group?.groupName || group?.group_name
       ),
     });

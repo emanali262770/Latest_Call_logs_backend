@@ -8,6 +8,7 @@ import {
   updateCustomerModel,
 } from "../model/customer.model.js";
 import { getCustomerGroupByIdModel } from "../model/customerGroup.model.js";
+import { createMeetingDetailModel } from "../model/meetingDetail.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 const hasOwn = (object, key) =>
@@ -125,6 +126,9 @@ export const createCustomer = async (req, res) => {
     });
 
     const createdCustomer = await getCustomerByIdModel(result.insertId);
+
+    // Auto-create a meeting detail entry for the new customer
+    await createMeetingDetailModel({ customer_id: result.insertId });
 
     return successResponse(res, "Customer created successfully", createdCustomer, 201);
   } catch (error) {

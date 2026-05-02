@@ -100,8 +100,13 @@ export const createEmployeeModel = async ({
   return result;
 };
 
-export const getEmployeesModel = async () => {
-  const [rows] = await db.execute(`SELECT * FROM employees ORDER BY id DESC`);
+export const getEmployeesModel = async ({ excludeAdmin = false } = {}) => {
+  const whereClause = excludeAdmin
+    ? `WHERE LOWER(TRIM(COALESCE(designation, ''))) != 'super admin'`
+    : "";
+  const [rows] = await db.execute(
+    `SELECT * FROM employees ${whereClause} ORDER BY id DESC`
+  );
   return rows;
 };
 

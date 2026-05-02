@@ -15,42 +15,42 @@ const router = express.Router();
 router.get(
   "/",
   protect,
-  checkPermission("INVENTORY.MESSAGE.READ"),
+  checkPermission("MEETINGS.MESSAGE.READ"),
   getMessageHistory
 );
 
 router.get(
   "/groups",
   protect,
-  checkPermission("INVENTORY.MESSAGE.READ"),
+  checkPermission("MEETINGS.MESSAGE.READ"),
   getMessageGroups
 );
 
 router.get(
   "/groups/:groupId/customers",
   protect,
-  checkPermission("INVENTORY.MESSAGE.READ"),
+  checkPermission("MEETINGS.MESSAGE.READ"),
   getMessageGroupCustomers
 );
 
 router.get(
   "/templates",
   protect,
-  checkPermission("INVENTORY.MESSAGE.READ"),
+  checkPermission("MEETINGS.MESSAGE.READ"),
   getMessageTemplates
 );
 
 router.post(
   "/preview",
   protect,
-  checkPermission("INVENTORY.MESSAGE.READ"),
+  checkPermission("MEETINGS.MESSAGE.READ"),
   previewMessage
 );
 
 router.post(
   "/send",
   protect,
-  checkPermission("INVENTORY.MESSAGE.SEND"),
+  checkPermission("MEETINGS.MESSAGE.CREATE"),
   sendMessage
 );
 

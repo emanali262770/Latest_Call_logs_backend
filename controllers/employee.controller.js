@@ -249,7 +249,8 @@ export const createEmployee = async (req, res) => {
 
 export const getEmployees = async (req, res) => {
   try {
-    const employees = await getEmployeesModel();
+    const excludeAdmin = req.query.exclude_admin === "true" || req.query.excludeAdmin === "true";
+    const employees = await getEmployeesModel({ excludeAdmin });
     return successResponse(
       res,
       "Employees fetched successfully",
