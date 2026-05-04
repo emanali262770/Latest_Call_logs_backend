@@ -734,4 +734,25 @@ export const ALL_PERMISSIONS = [
     key_name: "MEETINGS.MEETING_DETAIL.DELETE",
     description: "Delete meeting detail",
   },
+  {
+    module: "MEETINGS",
+    sub_module: "FOLLOW_UP",
+    action: "READ",
+    key_name: "MEETINGS.FOLLOW_UP.READ",
+    description: "Read follow-ups",
+  },
+  {
+    module: "MEETINGS",
+    sub_module: "FOLLOW_UP",
+    action: "UPDATE",
+    key_name: "MEETINGS.FOLLOW_UP.UPDATE",
+    description: "Update follow-up",
+  },
+  {
+    module: "MEETINGS",
+    sub_module: "FOLLOW_UP",
+    action: "DELETE",
+    key_name: "MEETINGS.FOLLOW_UP.DELETE",
+    description: "Delete follow-up",
+  },
 ];

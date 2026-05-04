@@ -4,6 +4,7 @@ import {
   updateMeetingDetailModel,
   deleteMeetingDetailModel,
 } from "../model/meetingDetail.model.js";
+import { ensureFollowUpForMeetingDetail } from "../model/followUp.model.js";
 import { getServiceByIdModel } from "../model/service.model.js";
 import { getEmployeeByIdModel } from "../model/employee.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
@@ -135,6 +136,10 @@ export const updateMeetingDetail = async (req, res) => {
       contact_method: contactMethod,
       remarks,
     });
+
+    if (status === "follow_up_required") {
+      await ensureFollowUpForMeetingDetail(id, nextFollowupDate, nextFollowupTime);
+    }
 
     const updated = await getMeetingDetailByIdModel(id);
     return successResponse(res, "Meeting detail updated successfully", updated);
